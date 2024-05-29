@@ -42,5 +42,22 @@ grid <- st_make_grid(qc,
     cellsize = cell_size,
     square = TRUE
 )
+# st_write(
+#     grid,
+#     paste0(local_path_save, "/qc_grid_1x1km_initiale.gpkg")
+# )
 
-qc_grid <- st_intersection(grid, qc) # super long, test sur Narval: /home/ccjuhasz/projects/def-dgravel/ccjuhasz/QC_in_a_CUBE/version_2
+# retrieve the wkt for qc
+qc_wkt <- st_as_text(st_geometry(qc))
+
+qc_1x1km <- st_read(paste0(local_path_save, "/qc_grid_1x1km_initiale.gpkg"),
+    wkt_filter = qc_wkt
+)
+
+qc_1x1km$ID <- 1:length(st_geometry(qc_1x1km))
+
+# x11(); plot(st_geometry(qc_1x1km)) # laborieux
+st_write(
+    qc_1x1km,
+    paste0(local_path_save, "/qc_grid_1x1km_finale.gpkg")
+)
