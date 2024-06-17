@@ -16,6 +16,7 @@ print(atlas.head())
 # Conversion du dataframe en geodataframe pour manipulation avec geopandas
 geoatlas = geopd.GeoDataFrame(atlas, geometry = geopd.points_from_xy(atlas.longitude, atlas.latitude), crs = "EPSG:4326")
 type(geoatlas)
+geoatlas.shape
 
 # verification with a sample
 samp = geoatlas[0:10001]
@@ -36,5 +37,7 @@ pix.head()
 pix1 = pix.iloc[[0]]
 type(pix1)
 pix1
-
-test_within = geopd.sjoin(samp, pix1, op = "within")
+# conversion of the crs pix1
+pix1 = pix1.to_crs(4326)
+test_within = geopd.sjoin(geoatlas, pix1, op = "within")
+test_within
