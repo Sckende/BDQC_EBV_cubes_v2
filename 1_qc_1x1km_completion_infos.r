@@ -4,6 +4,7 @@ library(viridis)
 library(dplyr)
 library(stringr)
 library(duckdb)
+library(duckdbfs)
 library(sfarrow)
 
 data_path <- "/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2"
@@ -22,19 +23,23 @@ atlas <- atlas_local(
     "atlas"
 )
 dim(atlas)
+
+# Check if obs only within Qc
 atlas |>
     group_by(within_quebec) |>
     summarize(cnt = count())
-atlas2 <- st_read_parquet(paste0(data_path, "/atlas_2024-05-29.parquet"))
-colnames(atlas)
-gc <- atlas |>
-    filter(within_quebec == "t") |>
-    collect()
 
-sp_count <- atlas |>
-    group_by(valid_scientific_name) |>
-    summarize(cnt = count()) |>
-    collect()
+# Conversion in sf object
+# WARNING - VOIR si possible d'éviter cette conversion en travaillant directement avec un format geoparquet, qui permettrait des requêtes spatiales directement sur le fichier
+colnames(atlas)
+
+atlas2 <- atlas |> mutate_at(c("longitude", "latitude"), as.numeric)
+atlas_sf <- atlas2 |>
+    mutate(geometry = ST_Point(longitude, latitude)) |>
+    to_sf(crs = 4326)
+
+atlas_sf
+
 
 
 
