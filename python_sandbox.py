@@ -1,89 +1,13 @@
-# import pandas as pd
-# import geopandas as geopd
-# import numpy as np
-# import matplotlib.pyplot as plt
-# import geoparquet as gpq
+import pandas as pd
+import geopandas as geopd
+import numpy as np
+import matplotlib.pyplot as plt
+import geoparquet as gpq
 import duckdb as d
 
-# from shapely.ops import unary_union
-
-# con = d.connect()
-# con.install_extension("spatial")
-# con.load_extension("spatial")
-
-# avec duckdb
-
-# Load spatial extension
-d.sql("INSTALL spatial; LOAD spatial")
-# Load HTTPs extension for request on s3 buckets
-d.sql("INSTALL https; LOAD https")
-
-# Lecture Atlas (parquet)
-atlas = d.read_parquet("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/atlas_2024-05-29.parquet")
-
-#https://object-arbutus.cloud.computecanada.ca/bq-io/acer/TdeB_benchmark_SDM/QUEBEC_Unique_poly.gpk
-
-d.sql("CREATE SECRET secret1 (TYPE S3, KEY_ID 'NJBPPQZX7PFUBP1LH8B0', SECRET 'DVQZTIQYUBxqs0nwtfA4n1meL8Fv9w977pSp8Gjc', ENDPOINT 's3.object-arbutus.cloud.computecanada.ca')")
-d.sql("DROP SECRET secret1")
-
-d.sql("CREATE TABLE atlas AS SELECT * FROM 's3://bq-io/atlas/parquet/atlas_2024-05-29.parquet'")
-
-
-# d.sql("CREATE TABLE atlas_sf AS SELECT *, ST_Point(CAST(longitude as float), CAST(latitude as float)) AS geometry, FROM atlas")
-
-# # Lecture qc-pix (geopackage)
-# d.sql("CREATE TABLE qc_pix AS SELECT * FROM ST_Read('/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/qc_polygons/qc_grid_1x1km_finale_latlon.gpkg')")
-
-# # Merge Atlas & qc-pix with a loop
-# # --> exploration
-# d.sql("SELECT min(year_obs) FROM atlas_sf") # 1534
-# d.sql("SELECT max(year_obs) FROM atlas_sf") #2023
-
-# d.sql("SELECT year_obs, COUNT(year_obs) FROM atlas_sf WHERE CAST(year_obs AS int) >= 1900 GROUP BY year_obs ORDER BY year_obs DESC")
-
-# # --> loop creation
-# for year in range(1900, 2024):
-#     print("---------------------------------------------->" + str(year))
-#     qu = "CREATE TABLE atlas_pix AS SELECT * FROM atlas_sf, qc_pix WHERE atlas_sf.year_obs == " + str(year) + " AND ST_Intersects(atlas_sf.geometry, qc_pix.geom)"
-#     print(qu)
-#     d.sql(qu)
-#     # Write the new db
-#     qu2 = "COPY (SELECT * FROM atlas_pix) TO 'atlas_pix_parquet/atlas_pix_" + str(year) + ".parquet' (FORMAT 'parquet')"
-#     d.sql(qu2)
-#     d.sql("DROP TABLE atlas_pix")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#### Explo duckDB ####
 # gestion des tables
 d.sql("DROP TABLE atlas_sf")
-
 
 d.sql("SELECT DISTINCT year_obs FROM atlas_pix")
 
@@ -91,27 +15,6 @@ d.sql("SELECT DISTINCT year_obs FROM atlas_pix")
 test = d.read_parquet("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/GITHUB/BDQC_EBV_cubes_v2/atlas_pix_parquet/atlas_pix_2011.parquet")
 
 d.sql("SELECT geom FROM test")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 data2000 = d.sql("SELECT * FROM dataB WHERE year_obs == '2000'")
 d.sql("SELECT CAST(latitude as float) FROM data2000")
@@ -143,22 +46,15 @@ d.sql("DROP TABLE multi_pix")
 d.sql("DESCRIBE data2000_sf")
 d.sql("SELECT COLUMN_NAME from information_schema.columns WHERE table_name = 'union2000'")
 
-
-
-
-
-
-
-
-
-
 d.sql("INSTALL spatial; LOAD spatial")
 d.sql("CREATE TABLE test_sf AS SELECT *, ST_asWKB(ST_Point(longitude, latitude)) as geometry, FROM data2000;")
+
+#### Exploration pandas, geopandas, matplotlib ####
+
+# --> Union Atlas-QcPix
 # importation du parquet local via pandas
 atlas = pd.read_parquet("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/atlas_2024-05-29.parquet", engine = "pyarrow")
 atlas.shape
-
-
 atlas = atlas[atlas["within_quebec"] == "t"]
 type(atlas)
 atlas.dtypes
@@ -294,3 +190,11 @@ chicago[chicago["ComAreaID"].isin(groceries_w_communities.ComAreaID.unique())].p
 plt.show()
 
 print(groceries_w_communities.dtypes)
+
+## --> Lecture & manipulation des fichiers parquets QcPix
+atlas2015 = pd.read_parquet("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/GITHUB/BDQC_EBV_cubes_v2/atlas_pix_parquet/atlas_pix_2015.parquet", engine = "pyarrow")
+atlas2015.columns.values
+type(atlas2015)
+atlas2015.geometry
+
+at2015 = geopd.read_parquet("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/GITHUB/BDQC_EBV_cubes_v2/atlas_pix_parquet/atlas_pix_2015.parquet")
