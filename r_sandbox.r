@@ -45,12 +45,12 @@ atlas_sf
 
 
 
-
-
-
-
-
-
+# Conversion pix Qc from utm to lonlat
+pix <- st_read("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/qc_polygons/qc_grid_1x1km_finale.gpkg")
+st_crs(pix)
+pixll <- st_transform(pix, crs = st_crs(4326))
+head(pixll)
+st_write(pixll, "/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/qc_polygons/qc_grid_1x1km_finale_latlon.gpkg")
 
 
 
