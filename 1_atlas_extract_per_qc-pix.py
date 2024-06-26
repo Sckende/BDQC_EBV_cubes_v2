@@ -1,4 +1,7 @@
 import duckdb as d
+import os
+
+
 
 # Load spatial extension
 d.sql("INSTALL spatial; LOAD spatial")
@@ -22,7 +25,7 @@ d.sql("CREATE TABLE qc_pix AS SELECT * FROM ST_Read('/home/local/USHERBROOKE/juh
 # Merge Atlas & qc-pix with a loop
 # --> exploration
 d.sql("SELECT min(year_obs) FROM atlas_sf") # 1534
-d.sql("SELECT max(year_obs) FROM atlas_sf") #2023
+d.sql("SELECT max(year_obs) FROM atlas_sf") # 2023
 
 d.sql("SELECT year_obs, COUNT(year_obs) FROM atlas_sf WHERE CAST(year_obs AS int) >= 1900 GROUP BY year_obs ORDER BY year_obs DESC")
 
@@ -37,7 +40,7 @@ d.sql("SHOW qc_pix")
 # --> loop creation
 for year in range(1900, 2024):
     print("---------------------------------------------->" + str(year))
-    qu = "CREATE TABLE atlas_pix AS SELECT atlas_sf.valid_scientific_name, atlas_sf.longitude, atlas_sf.latitude, atlas_sf.year_obs, atlas_sf.month_obs, atlas_sf.day_obs, atlas_sf.group_en, atlas_sf.kingdom, atlas_sf.phylum, atlas_sf.class, atlas_sf.order, atlas_sf.family, atlas_sf.genus, qc_pix.ID AS pix_id, qc_pix.geom AS geom_sql, to_binary(qc_pix.geom) AS geometry FROM atlas_sf, qc_pix WHERE atlas_sf.year_obs == " + str(year) + " AND ST_Intersects(atlas_sf.geometry, qc_pix.geom)"
+    qu = "CREATE TABLE atlas_pix AS SELECT atlas_sf.valid_scientific_name, atlas_sf.longitude, atlas_sf.latitude, atlas_sf.year_obs, atlas_sf.month_obs, atlas_sf.day_obs, atlas_sf.group_en, atlas_sf.kingdom, atlas_sf.phylum, atlas_sf.class, atlas_sf.order, atlas_sf.family, atlas_sf.genus, qc_pix.ID AS pix_id, qc_pix.geom AS geometry, to_binary(qc_pix.geom) AS geometry_text FROM atlas_sf, qc_pix WHERE atlas_sf.year_obs == " + str(year) + " AND ST_Intersects(atlas_sf.geometry, qc_pix.geom)"
     print(qu)
     d.sql(qu)
     # d.sql("SHOW atlas_pix")
@@ -45,27 +48,22 @@ for year in range(1900, 2024):
 
 
     # Write the new db
-    qu2 = "COPY (SELECT * FROM atlas_pix) TO 'atlas_pix_parquet/atlas_pix_" + str(year) + ".parquet' (FORMAT 'parquet')"
+    # ici passe par un csv puis un parquet avec GDAL car incapable de recuperer les geometries au format blob quand on cree un parquet avec SQL
+    # qu2 = "COPY (SELECT * FROM atlas_pix) TO 'atlas_pix_parquet/atlas_pix_" + str(year) + ".parquet' (FORMAT 'parquet')"
+    qu2 = "COPY (SELECT * FROM atlas_pix) TO '/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/atlas_pix_parquet/atlas_pix_" + str(year) + ".csv' CSV HEADER DELIMITER ','"
     d.sql(qu2)
     d.sql("DROP TABLE atlas_pix")
 
-
-
-
-
-
-
-
-### WARNING !!! ###
-# voir avec Guillaume pour la création d'un géoparquet valide, c'est à dire créer le geo metadata
-# voir également pourquoi impossible de convertir le blob créé à partir de geomn dans SQL dans python 
-
-
-
+    req = "ogr2ogr -f Parquet -s_srs EPSG:4326 -t_srs EPSG:4326 /home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/atlas_pix_parquet/atlas_pix_" + str(year) + ".parquet /home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/atlas_pix_parquet/atlas_pix_" + str(year) + ".csv"
+    os.system(req)
+    os.system("rm /home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/atlas_pix_parquet/*.csv")
 
 
 # ------------------------------------------------------------- #
 # Zone de verification
+# ------------------------------------------------------------- #
+
+# Zone de test pour writer un file en geoparquet
 year=2015
 qu = "CREATE TABLE atlas_pix AS SELECT * FROM atlas_sf, qc_pix WHERE atlas_sf.year_obs == " + str(year) + " AND ST_Intersects(atlas_sf.geometry, qc_pix.geom)"
 print(qu)
@@ -73,105 +71,57 @@ d.sql(qu)
 
 d.sql("SELECT * FROM atlas_pix")
 
-
-
-# Zone de test pour writer un file en geoparquet
 # Etapes de Guillaume: requete sql sur db, write in csv, converti le csv en parquet avec GDAL
 # cf script geospatial-docker/atlas2pmtiles.sh 
 d.sql("COPY (SELECT * FROM atlas_pix) TO 'atlas2015_test.csv' CSV HEADER DELIMITER ','")
+
 #GDAL
 ogr2ogr -f Parquet -s_srs EPSG:4326 -t_srs EPSG:4326 atlas2015_test.parquet atlas2015_test.csv
 
 #--> voir avec Guillaume
 # pb est qu'il manque REQUIRED METADATA pour valider le parquet en geoparquet : A GeoParquet file MUST include a geo key in the Parquet metadata (see FileMetaData::key_value_metadata). The value of this key MUST be a JSON-encoded UTF-8 string representing the file and column metadata that validates against the GeoParquet metadata schema. The file and column metadata fields are described below (cf https://geoparquet.org/releases/v1.0.0/ & https://github.com/geopandas/geopandas/discussions/3158) 
+
+
+
+
+#### Extraction of the spe richness and spe lust for each pix for each year ####
 import geopandas as geopd
 import pandas as pd
 
-test2 = geopd.read_parquet("atlas2015_test.parquet")
-at2015 = pd.read_parquet("atlas2015_test.parquet")
-at2015.columns.values
-pix2015 = at2015[['ID', 'geom']]
-from shapely import wkt
-pix2015["geom"] = geopd.GeoSeries.from_wkt(pix2015["geom"])
-pix2015_sf = geopd.GeoDataFrame(pix2015, geometry = 'geom', crs = "EPSG:4326")
-type(pix2015_sf)
+global_spe_rich=geopd.GeoDataFrame(columns=["pix_id", "spe_rich", "spe_list", "geometry", "year"])
 
-pix2015_sf.iloc[[1]].plot()
-pix2015_sf.plot()
-plt.show()
-type(pix2015_sf.iloc[[1]])
+# for year in range(1900, 2024):
+for year in range(2011, 2024):
 
-# ----- #
-occ2015 = at2015.iloc[:,0:27]
-type(occ2015)
-occ2015.columns.values
-occ2015["geometry"] = geopd.GeoSeries.from_wkt(occ2015["geometry"])
-occ2015_sf = geopd.GeoDataFrame(occ2015, geometry = 'geometry', crs = "EPSG:4326")
-occ2015_sf.shape
-occ2015_sf.plot()
-plt.show()
-# ID conversion to numeric
-occ2015_sf.ID = pd.to_numeric(occ2015_sf.ID)
+    data_path="/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/atlas_pix_parquet/atlas_pix_" + str(year) + ".parquet"
+    data=pd.read_parquet(data_path)
+    uniq_pix=data.drop_duplicates("geometry")[["pix_id", "geometry"]]
 
-occ2015_sf.ID.unique()
-occ2015_sf.ID.value_counts().sort_index()
-occ2015_sf.geometry.value_counts().sort_index()
+    spe_list=data.groupby("pix_id")["valid_scientific_name"].unique()
+    spe_rich=data.groupby("pix_id")["valid_scientific_name"].nunique()
+    info_pix=pd.DataFrame({'pix_id':spe_list.index, 'spe_rich':spe_rich.values, 'spe_list':spe_list.values})
 
-max(occ2015_sf.ID.value_counts())
-occ2015_sf[occ2015_sf['ID'] == 26].shape
-pix26=occ2015_sf[occ2015_sf['ID'] == 26]
-pix26.latitude.describe()
-pix26.longitude.describe()
+    # left join
+    final=info_pix.merge(uniq_pix, how='left', on='pix_id') #dataframe
+    # conversion to geodataframe
+    final["geometry"] = geopd.GeoSeries.from_wkt(final["geometry"])
+    final_sf=geopd.GeoDataFrame(final, geometry = "geometry", crs = "EPSG:4326")
+    final["year"]=year
+    print("----------> Year " + str(year) + " DONE !")
 
-pix26[['longitude', 'latitude', 'geometry']]
+    global_spe_rich=pd.concat([global_spe_rich, final])
 
-import matplotlib.pyplot as plt
-pix26.plot()
-plt.show()
+# Exploration
+global_spe_rich.dtypes
+global_spe_rich.spe_rich.describe()
+max(global_spe_rich.spe_rich)
 
-occ2015_sf[occ2015_sf['ID'] == '44840'].plot()
-pix2015_sf.iloc[[1]].plot()
-
-plt.show()
-
-
-#### Test from the generated parquet
-import geopandas as geopd
-import pandas as pd
-import shapely as shp
-import matplotlib.pyplot as plt
-
-pq1984=pd.read_parquet("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/GITHUB/BDQC_EBV_cubes_v2/atlas_pix_parquet/atlas_pix_1984.parquet")
-type(pq1984.geom)
-pq1984.columns.values
-pq1984.dtypes
-pq1984.geom.describe()
-pq1984.geometry.describe()
-pq1984.geometry_text.describe()
-pq1984[['geometry', 'geom']]
-
-test=pq1984[['geometry_text']]
-test_sf=shp.from_wkb(test)
-
-
-test_sf.plot()
-plt.show()
-test.describe()
-
-# Erreur incomprehensible
-# voir ressources https://shapely.readthedocs.io/en/stable/reference/shapely.from_wkb.html
-t=pq1984.geometry[0]
-shp.from_wkb(t)
-pq1984["geometry_bin"] = geopd.GeoSeries.from_wkb(pq1984["geometry_bin"])
-pq1984["geometry"] = geopd.GeoSeries.from_wkb(pq1984["geometry"])
-
-pq1984.geometry_bin.describe()
-
-pq1984_sf = geopd.GeoDataFrame(pq1984, geometry = 'geom', crs = "EPSG:4326")
-pq1984_sf.geom.describe()
-pq1984_sf.plot()
-plt.show()
-
-
-
-test2 = geopd.read_parquet("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/GITHUB/BDQC_EBV_cubes_v2/atlas_pix_parquet/atlas_pix_1984.parquet")
+# In order to create a geoparquet
+# see https://geoparquet.org/releases/v1.1.0/schema.json
+# and https://geoparquet.org/releases/v1.1.0/
+global_spe_rich.index
+global_spe_rich.to_parquet(path="/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/atlas_pix_parquet/EBV_rich_spe_raw_data.parquet")
+                        #    , index=False, compression="None", geometry_encoding="WKB", write_covering_bbox=False, schema_version=None)
+# *** write_covering_bbox: Writes the bounding box column for each row entry with column name ‘bbox’. Writing a bbox column can be computationally expensive, but allows you to specify a bbox in : func:read_parquet for filtered reading. Note: this bbox column is part of the newer GeoParquet 1.1 specification and should be considered as experimental. While writing the column is backwards compatible, using it for filtering may not be supported by all readers.
+# *** aactual version of geoparquet on my laptop is 0.0.3, not accepted for the argument schema_version ({‘0.1.0’, ‘0.4.0’, ‘1.0.0’, ‘1.1.0’, None})
+# pip freeze pour voir les versions des paquets installés

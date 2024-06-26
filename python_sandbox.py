@@ -198,3 +198,68 @@ type(atlas2015)
 atlas2015.geometry
 
 at2015 = geopd.read_parquet("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/GITHUB/BDQC_EBV_cubes_v2/atlas_pix_parquet/atlas_pix_2015.parquet")
+
+#### Test from the generated parquet ####
+import geopandas as geopd
+import pandas as pd
+import shapely as shp
+import matplotlib.pyplot as plt
+
+pq1984=pd.read_parquet("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/atlas_pix_parquet/atlas_pix_2020.parquet")
+pq1984.columns.values
+type(pq1984.geometry)
+pq1984.dtypes
+pq1984.geometry.describe()
+pq1984.pix_id.describe()
+
+# spatial object conversion
+
+# ---> keep the unique pixels
+uniq_pix = pq1984.drop_duplicates("geometry")
+uniq_pix.columns.values
+uniq_pix.geometry
+type(uniq_pix)
+uniq_pix.dtypes
+uniq_pix.shape
+uniq_pix["geometry"] = geopd.GeoSeries.from_wkt(uniq_pix["geometry"]) # Voir avec Guillaume pourquoi cette ligne est indispensable?
+uniq_pix_sf = geopd.GeoDataFrame(uniq_pix, geometry = "geometry", crs = "EPSG:4326")
+type(uniq_pix_sf)
+uniq_pix_sf.shape
+pix1984=uniq_pix_sf[["pix_id", "geometry"]]
+type(pix1984)
+pix1984.dtypes
+
+# ---> visualisation
+pix1984.plot()
+plt.show()
+
+# ---> Compute the species richness by pixel
+# subtest = pq1984.iloc[1:100]
+# subtest.geometry.describe()
+# subtest.columns.values
+
+l=pq1984.groupby("pix_id")["valid_scientific_name"].unique()
+info=pq1984.groupby("pix_id")["valid_scientific_name"].nunique()
+type(info)
+# conversion from series to dataframe
+info_df = pd.DataFrame({'pix_id':info.index, 'spe_rich':info.values, 'spe_list':l.values})
+type(info_df)
+# retrieve the geom pixel
+# pix_geom=subtest[["pix_id", "geometry"]]
+# type(pix_geom)
+# res=pd.merge(left=info_df, right=pix_geom, on="pix_id", how="left")
+# res.columns.values
+
+# pix1984.dtypes
+# info_df.dtypes
+# info_df.join(pix1984, on="pix_id", how="left")
+
+info_df2=info_df.merge(pix1984, how='left', on='pix_id') #dataframe
+# conversion to geodataframe
+type(info_df2)
+info_sf=geopd.GeoDataFrame(info_df2, geometry = "geometry", crs = "EPSG:4326")
+# ---> visualisation - choropleth map (maps where the color of each shape is based on the value of an associated variable)
+#https://geopandas.org/en/stable/docs/user_guide/mapping.html
+
+info_sf.plot(column="spe_rich", legend=True, cmap="OrRd", scheme="quantiles")
+plt.show()
