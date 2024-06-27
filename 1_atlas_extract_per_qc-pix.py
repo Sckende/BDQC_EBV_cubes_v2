@@ -125,3 +125,10 @@ global_spe_rich.to_parquet(path="/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/da
 # *** write_covering_bbox: Writes the bounding box column for each row entry with column name ‘bbox’. Writing a bbox column can be computationally expensive, but allows you to specify a bbox in : func:read_parquet for filtered reading. Note: this bbox column is part of the newer GeoParquet 1.1 specification and should be considered as experimental. While writing the column is backwards compatible, using it for filtering may not be supported by all readers.
 # *** aactual version of geoparquet on my laptop is 0.0.3, not accepted for the argument schema_version ({‘0.1.0’, ‘0.4.0’, ‘1.0.0’, ‘1.1.0’, None})
 # pip freeze pour voir les versions des paquets installés
+
+# test parquet --> GOOD !
+data_path="/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/atlas_pix_parquet/EBV_rich_spe_raw_data.parquet"
+rich=pd.read_parquet(data_path)
+rich["geometry"] = geopd.GeoSeries.from_wkb(rich["geometry"])
+rich_sf=geopd.GeoDataFrame(rich, geometry = "geometry", crs = "EPSG:4326")
+rich_sf
