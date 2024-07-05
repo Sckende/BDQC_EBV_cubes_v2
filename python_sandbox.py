@@ -263,3 +263,150 @@ info_sf=geopd.GeoDataFrame(info_df2, geometry = "geometry", crs = "EPSG:4326")
 
 info_sf.plot(column="spe_rich", legend=True, cmap="OrRd", scheme="quantiles")
 plt.show()
+
+
+#### Travail sur les rasters ####
+
+import geopandas as gpd
+import matplotlib.pyplot as plt
+# from matplotlib import pyplot
+import numpy as np
+import rasterio as rio
+from rasterio import plot
+from rasterio.plot import show
+from rasterio.mask import mask
+
+# get polygons
+shapef=gpd.read_file("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_regions/CERQ_SHP/CR_NIV_01_S.shp")
+shapef.plot(column="FID01")
+plt.show()
+
+# get raster
+raster1=rio.open("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/vireo_flavifrons_range_2017.tif")
+plt.imshow(raster1.read(1))
+plt.show()
+raster1.meta
+
+
+# get the crs
+shapef.crs #321988
+raster1.crs #32198
+
+# convert crs polygons to crs raster
+sf2=shapef.to_crs(32198)
+sf2.plot(facecolor="none", edgecolor="grey")
+plt.show()
+ 
+# plot raster & polygons side by side
+fig, (axr, axg) = plt.subplots(1, 2)
+show((raster1, 1), ax=axr, cmap='Reds', title="distribution")
+sf2.plot(ax=axg, facecolor="none", edgecolor="grey")
+plt.show()
+
+# plot polygons over raster
+fig, (ax1, ax2) = plt.subplots(1,2)
+show((raster1, 1), ax=ax1, cmap='Reds', title="distribution")
+sf2.plot(ax=ax1, facecolor="none", edgecolor="grey", linewidth = 0.25)
+sf2.iloc[[2]].plot(ax=ax2)
+plt.show()
+
+# ---> look https://www.youtube.com/watch?v=Tqph7_qMujk & https://www.youtube.com/watch?v=LRbOgRKWVag for subplot informationsfig, (ax1, ax2) = plt.subplots(1,2)
+show((sp1, 1), ax=ax1)
+show((sp2, 1), ax=ax2)
+plt.show()
+
+#### clip raster from a polygon ####
+# -------------------------------- # 
+import pycrs
+# Read the polygon
+poly=sf2.iloc[[3]]
+type(poly)
+
+# read the raster
+raster1
+
+# Check if the crs is the same for the two files
+poly.crs
+raster1.crs
+
+# crop
+rastmask,_=rio.mask.mask(raster1, poly.geometry, crop=True)
+
+# Visualisation
+fig = plt.figure(figsize=[12,8])
+# Plot the raster data using matplotlib
+ax = fig.add_axes([0, 0, 1, 1])
+raster_image=ax.imshow(rastmask[0,:,:])
+plt.show()
+
+# delete nan values
+type(rastmask)
+rast2=rastmask[~np.isnan(rastmask)]
+rast2.sum()
+rast2.max()
+
+#### Stack several rasters and add description in metadata (species names) ####
+#1-Modify the metadata to include the species names
+raster1=rio.open("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/vireo_flavifrons_range_2017.tif")
+metadata=raster1.meta.copy()
+type(metadata)
+metadata['name'] = "Species name"
+
+raster1.meta.update() = metadata
+raster1.tags()
+
+
+#### Stack several rasters ####
+# -------------------------- # 
+import rasterio as rio
+import matplotlib.pyplot as plt
+from rasterio.plot import show
+
+
+sp1=rio.open("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/vireo_flavifrons_range_2017.tif")
+plt.imshow(sp1.read(1))
+plt.show()
+sp2=rio.open("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/vireo_gilvus_range_2017.tif")
+sp3=rio.open("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/vireo_olivaceus_range_2017.tif")
+sp4=rio.open("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/vireo_philadelphicus_range_2017.tif")
+sp5=rio.open("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/vireo_solitarius_range_2017.tif")
+
+# visual
+fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2,3)
+show((sp1, 1), ax=ax1)
+show((sp2, 1), ax=ax2)
+show((sp3, 1), ax=ax3)
+show((sp4, 1), ax=ax4)
+show((sp5, 1), ax=ax5)
+plt.show()
+
+# Preparation pour le stack
+out_img="stack_sp.tif"
+
+out_meta=sp5.meta.copy()
+out_meta.update({"count": 5})
+
+# stackage
+file_list=[sp1, sp2, sp3, sp4, sp5]
+with rio.open(out_img, 'w', **out_meta) as dest:
+    for band_nr, src in enumerate(file_list, start=1):
+        dest.write(src, band_nr)
+
+
+stack=rio.open("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/GITHUB/BDQC_EBV_cubes_v2/stack_sp.tif")
+type(stack)
+
+
+fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2,3)
+show((stack, 1), ax=ax1)
+show((stack, 2), ax=ax2)
+show((stack, 3), ax=ax3)
+show((stack, 4), ax=ax4)
+show((stack, 5), ax=ax5)
+plt.show()
+
+show(stack.read(1))
+plt.show()
+
+### autre methode
+from osgeo import gdal #impossible installer osgeo
