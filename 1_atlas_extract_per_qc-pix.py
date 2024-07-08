@@ -84,7 +84,7 @@ ogr2ogr -f Parquet -s_srs EPSG:4326 -t_srs EPSG:4326 atlas2015_test.parquet atla
 
 
 
-#### Extraction of the spe richness and spe lust for each pix for each year ####
+#### Extraction of the spe richness and spe list for each pix for each year ####
 import geopandas as geopd
 import pandas as pd
 
