@@ -1,5 +1,6 @@
 # Objectif: Pour chaque pixel de 1x1 inclut dans le Qc, obtenir la liste des espèces et la richesse spécifique
 library(sf)
+library(terra)
 library(viridis)
 library(dplyr)
 library(stringr)
@@ -310,3 +311,15 @@ dim(alces_df[alces_df$year_obs == "2000" & as.numeric(alces_df$latitude) == -90,
 
 library(terra)
 terra::rast(vect(alces_sf))
+
+
+rast <- list.files("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test", pattern = "vireo", full.names = TRUE)
+
+rast <- "/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/test.tif"
+st <- terra::rast(rast)
+terra::plot(st)
+
+st
+rs <- sum(st)
+rs
+terra::plot(rs)

@@ -9,11 +9,16 @@ d.sql("INSTALL spatial; LOAD spatial")
 d.sql("INSTALL https; LOAD https")
 
 # Lecture Atlas (parquet) local 
-atlas = d.read_parquet("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/atlas_2024-05-29.parquet")
+atlas = d.read_parquet("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/atlas_2024-07-08.parquet")
 
 # Lecture Atlas en remote
-d.sql("CREATE SECRET secret1 (TYPE S3, KEY_ID 'XXXX', SECRET 'xxxxx', URL_STYLE path, ENDPOINT 'object-arbutus.cloud.computecanada.ca')")
-d.sql("CREATE TABLE atlas AS SELECT * FROM 's3://bq-io/atlas/parquet/atlas_2024-05-29.parquet'")
+d.sql("CREATE SECRET secret1 (TYPE S3, KEY_ID 'NJBPPQZX7PFUBP1LH8B0', SECRET 'DVQZTIQYUBxqs0nwtfA4n1meL8Fv9w977pSp8Gjc', URL_STYLE path, ENDPOINT 'object-arbutus.cloud.computecanada.ca')")
+# d.sql("CREATE TABLE atlas AS SELECT * FROM 's3://bq-io/atlas/parquet/atlas_2024-05-29.parquet'") # parquet file
+d.sql("CREATE TABLE atlas_sf AS SELECT * FROM 's3://bq-io/atlas/parquet/atlas_2024-07-09.parquet'") # GEOparquet file
+d.sql("SELECT DISTINCT year_obs FROM atlas_sf")
+d.sql("SELECT group_en, COUNT(group_en) FROM atlas_sf GROUP BY group_en")
+d.sql("SELECT group_fr, COUNT(group_fr) FROM atlas_sf GROUP BY group_fr")
+
 # d.sql("DROP SECRET secret1")
 
 # Conversion en objet spatial
@@ -84,32 +89,109 @@ ogr2ogr -f Parquet -s_srs EPSG:4326 -t_srs EPSG:4326 atlas2015_test.parquet atla
 
 
 
-#### Extraction of the spe richness and spe list for each pix for each year ####
+#### Extraction of the spe richness and spe list for each pix for each year for each taxa group ####
 import geopandas as geopd
 import pandas as pd
+import matplotlib.pyplot as plt
+from rasterio.plot import show
+import os
+import rasterio as rio
+from rasterio.mask import mask
+init_path="/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/"
 
-global_spe_rich=geopd.GeoDataFrame(columns=["pix_id", "spe_rich", "spe_list", "geometry", "year"])
+# qc = geopd.read_file(init_path + "qc_polygons/QUEBEC_unique_poly.gpkg").to_crs(4326)
+# qc_json = qc.to_json()
+# qc.to_file("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/qc_poly.json", driver="GeoJSON")
+
+qc_pix=geopd.read_file(init_path + "qc_polygons/qc_grid_1x1km_finale_latlon.gpkg")
+qc_pix=qc_pix.rename(columns={'ID':'pix_id'})
+
+qc.plot()
+plt.show()
+
+global_spe_rich=geopd.GeoDataFrame(columns=["pix_id", "geometry", "spe_rich", "spe_list", "group_en", "year"])
+
+taxa_group=["Bryophytes", "Other plants", "Amphibians"]
 
 # for year in range(1900, 2024):
-for year in range(2011, 2024):
-
-    data_path="/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/atlas_pix_parquet/atlas_pix_" + str(year) + ".parquet"
+for year in range(2020, 2024):
+    for taxa in taxa_group:
+        print(year, taxa)
+    data_path=init_path + "atlas_pix_parquet/atlas_pix_" + str(year) + ".parquet"
     data=pd.read_parquet(data_path)
-    uniq_pix=data.drop_duplicates("geometry")[["pix_id", "geometry"]]
+    # uniq_pix=data.drop_duplicates("geometry")[["pix_id", "geometry"]]
+    
 
-    spe_list=data.groupby("pix_id")["valid_scientific_name"].unique()
-    spe_rich=data.groupby("pix_id")["valid_scientific_name"].nunique()
-    info_pix=pd.DataFrame({'pix_id':spe_list.index, 'spe_rich':spe_rich.values, 'spe_list':spe_list.values})
+    spe_list=data.groupby(["pix_id", "group_en"])["valid_scientific_name"].unique()
+    spe_list=spe_list.reset_index() # split le multi-index in two columns
+    spe_rich=data.groupby(["pix_id", "group_en"])["valid_scientific_name"].nunique()
+    info_pix=pd.DataFrame({'pix_id':spe_list.pix_id, 'spe_rich':spe_rich.values, 'spe_list':spe_list.valid_scientific_name, 'group_en':spe_list.group_en, 'year':year})
+    info_pix['pix_id']=pd.to_numeric(info_pix['pix_id'])
 
-    # left join
-    final=info_pix.merge(uniq_pix, how='left', on='pix_id') #dataframe
+    # left join to get information of pixels
+    # --------------------------------------
+    final=qc_pix.merge(info_pix, how='left', on='pix_id')
+    # final[98:120]
+    final['spe_rich'] = final['spe_rich'].fillna(0)
+    final['year'] = final['year'].fillna(year)
+
     # conversion to geodataframe
-    final["geometry"] = geopd.GeoSeries.from_wkt(final["geometry"])
+    # final["geometry"] = geopd.GeoSeries.from_wkt(final["geometry"])
     final_sf=geopd.GeoDataFrame(final, geometry = "geometry", crs = "EPSG:4326")
-    final["year"]=year
+
+
+    # final_sf.plot(column='spe_rich')
+    # plt.show()
+
     print("----------> Year " + str(year) + " DONE !")
 
-    global_spe_rich=pd.concat([global_spe_rich, final])
+    # update GEOdataframe with species richness and list of species
+    # -------------------------------------------------------------
+
+    global_spe_rich=pd.concat([global_spe_rich, final_sf])
+
+    # rasterization for each year for the EBV map
+    # -------------------------------------------
+
+    data2 = final_sf.drop(columns=["spe_list"])
+    data2.spe_rich.min()
+    data2.spe_rich.max()
+    data2.spe_rich.describe()
+
+    # 1- from geodf to geojson
+    # geoj=data2.to_json()
+    data2.to_file("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/geojson_test.json", driver="GeoJSON")
+    # 2 - from geojson to raster with rasterio
+    os.system("rio rasterize /home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/test.tif --res 0.0167 < /home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/geojson_test.json")
+    # 3 - mask with qc polygon
+    os.system("rio mask /home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/test.tif /home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/test_crop.tif --crop --geojson-mask - < /home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/qc_poly.json")
+    # 3 - visualisation
+    raster1=rio.open("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/test.tif")
+    raster1.meta
+    raster1_crop=rio.open("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/test_crop.tif")
+    raster1_crop.meta
+
+# Visual explo
+fig, (ax1, ax2) = plt.subplots(1,2)
+show((raster1, 1), ax=ax1)
+# qc.plot(ax=ax1, facecolor="none", edgecolor="grey", linewidth = 0.25)
+show((raster1_crop, 1), ax=ax2)
+# qc.plot(ax=ax2, facecolor="none", edgecolor="grey", linewidth = 0.25)
+plt.show()
+
+# Pour calcul sur raster, necessaire d'enlever les nan
+import numpy as np
+rast2=raster1[~np.isnan(raster1)]
+rast2.sum()
+rast2.max()
+
+
+import matplotlib.pyplot as plt
+
+plt.imshow(raster1_crop, cmap='viridis')
+plt.colorbar(label='Data Values')
+plt.title('Raster with Nodata Values')
+plt.show() 
 
 # Exploration
 global_spe_rich.dtypes

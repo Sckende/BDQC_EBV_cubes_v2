@@ -9,7 +9,9 @@ import duckdb as d
 # gestion des tables
 d.sql("DROP TABLE atlas_sf")
 
-d.sql("SELECT DISTINCT year_obs FROM atlas_pix")
+d.sql("SELECT DISTINCT year_obs FROM atlas")
+d.sql("SELECT * FROM atlas")
+
 
 # test
 test = d.read_parquet("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/GITHUB/BDQC_EBV_cubes_v2/atlas_pix_parquet/atlas_pix_2011.parquet")
