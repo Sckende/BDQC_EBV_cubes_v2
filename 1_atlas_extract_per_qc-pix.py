@@ -115,8 +115,8 @@ taxa_group=["Bryophytes", "Other plants", "Amphibians"]
 
 # for year in range(1900, 2024):
 for year in range(2020, 2024):
-    for taxa in taxa_group:
-        print(year, taxa)
+    # for taxa in taxa_group:
+    #     print(year, taxa)
     data_path=init_path + "atlas_pix_parquet/atlas_pix_" + str(year) + ".parquet"
     data=pd.read_parquet(data_path)
     # uniq_pix=data.drop_duplicates("geometry")[["pix_id", "geometry"]]
@@ -138,7 +138,7 @@ for year in range(2020, 2024):
     # conversion to geodataframe
     # final["geometry"] = geopd.GeoSeries.from_wkt(final["geometry"])
     final_sf=geopd.GeoDataFrame(final, geometry = "geometry", crs = "EPSG:4326")
-
+##### FAIRE UN RASTER PAR GROUPE TAXO PAR ANNEE !!!!!! #######
 
     # final_sf.plot(column='spe_rich')
     # plt.show()
@@ -214,3 +214,9 @@ rich=pd.read_parquet(data_path)
 rich["geometry"] = geopd.GeoSeries.from_wkb(rich["geometry"])
 rich_sf=geopd.GeoDataFrame(rich, geometry = "geometry", crs = "EPSG:4326")
 rich_sf
+
+
+
+
+
+rs = geopd.read_file("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/geojson_test.json")
