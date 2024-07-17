@@ -5,7 +5,9 @@ library(mapview)
 
 # canadian ecozones, ecoprovinces, ecoregions, ecodistricts
 # data downloaded from https://sis.agr.gc.ca/siscan/nsdb/ecostrat/gis_data.html
-local_path <- "/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_regions"
+# local_path <- "/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_regions" # XPS
+local_path <- "/home/claire/BDQC-GEOBON/data/QUEBEC_regions" # YOGA
+
 ecoZo <- st_read(paste0(local_path, "/Ecozones")) # 25 polygones
 ecoPro <- st_read(paste0(local_path, "/Ecoprovinces")) # 68 polygones
 ecoReg <- st_read(paste0(local_path, "/Ecoregions")) # 218 polygones
@@ -26,7 +28,9 @@ qc_eco <- lapply(can_spat, function(x) {
 })
 
 # Local save
-local_path_save <- "/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/qc_polygons"
+# local_path_save <- "/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/qc_polygons" # XPS
+local_path_save <- paste0(local_path, "/sf_eco_poly") # XPS
+
 n <- c("ecozones", "ecoprovinces", "ecoregions", "ecodistricts")
 for (i in 1:4) {
     st_write(
