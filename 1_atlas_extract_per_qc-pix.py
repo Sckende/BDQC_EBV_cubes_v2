@@ -96,7 +96,11 @@ import matplotlib.pyplot as plt
 from rasterio.plot import show
 import os
 import rasterio as rio
+from rasterio import features
+from rasterio.enums import MergeAlg
 from rasterio.mask import mask
+from numpy import int16  
+
 init_path="/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/"
 
 # qc = geopd.read_file(init_path + "qc_polygons/QUEBEC_unique_poly.gpkg").to_crs(4326)
@@ -109,7 +113,7 @@ qc_pix=qc_pix.rename(columns={'ID':'pix_id'})
 qc.plot()
 plt.show()
 
-global_spe_rich=geopd.GeoDataFrame(columns=["pix_id", "geometry", "spe_rich", "spe_list", "group_en", "year"])
+global_spe_rich=geopd.GeoDataFrame(columns=["pix_id", "spe_rich", "spe_list", "group_en", "year"])
 
 taxa_group=["Bryophytes", "Other plants", "Amphibians"]
 
@@ -128,48 +132,70 @@ for year in range(2020, 2024):
     info_pix=pd.DataFrame({'pix_id':spe_list.pix_id, 'spe_rich':spe_rich.values, 'spe_list':spe_list.valid_scientific_name, 'group_en':spe_list.group_en, 'year':year})
     info_pix['pix_id']=pd.to_numeric(info_pix['pix_id'])
 
-    # left join to get information of pixels
-    # --------------------------------------
-    final=qc_pix.merge(info_pix, how='left', on='pix_id')
-    # final[98:120]
-    final['spe_rich'] = final['spe_rich'].fillna(0)
-    final['year'] = final['year'].fillna(year)
+    # update GEOdataframe with species richness and list of species
+    # -------------------------------------------------------------
+    global_spe_rich=pd.concat([global_spe_rich, info_pix])
 
-    # conversion to geodataframe
-    # final["geometry"] = geopd.GeoSeries.from_wkt(final["geometry"])
-    final_sf=geopd.GeoDataFrame(final, geometry = "geometry", crs = "EPSG:4326")
-##### FAIRE UN RASTER PAR GROUPE TAXO PAR ANNEE !!!!!! #######
+    # rasterization for each year for each taxonomic group
+    # ---------------------------------------------------
+
+    # 1 - left join to get information for all pixels per taxo group
+    # --------------------------------------------------------------
+    data2 = info_pix.drop(columns=["spe_list"])
+
+    for group in taxa_group:
+            
+        data_group = data2[data2["group_en"] == group]
+        data_group_join = qc_pix.merge(data_group, how='left', on='pix_id')
+        data_group_join['spe_rich'] = data_group_join['spe_rich'].fillna(0)
+        data_group_join['year'] = data_group_join['year'].fillna(year)
+        
+        data_group_join.plot(column = "spe_rich")
+        plt.show()
+# test avec utilisation geopackage
+        data_group_join.to_file("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/birds_2020.gpkg", driver = "GPKG")
+
+
+
+
+
+
+
+#### ===> reprendre ici pour la rasterisation
+        shapes = ((geom,value) for geom, value in zip(data_group_join.geometry, data_group_join["spe_rich"]))
+
+        raster = rasterio.features.rasterize(shapes = shapes, out_shape = )
+        # data_group_join.spe_rich.min()
+        # data_group_join.spe_rich.max()
+        # data_group_join.spe_rich.describe()
+
+        # 2 - conversion to geodataframe
+        # ------------------------------
+        group_sf=geopd.GeoDataFrame(data_group_join, geometry = "geometry", crs = "EPSG:4326")
+
+        # 3 - from geodf to geojson
+        # -------------------------
+        # geoj=data2.to_json()
+        group_sf.to_file("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/geojson_test.json", driver="GeoJSON")
+
+        # 4 - from geojson to raster with rasterio
+        # ----------------------------------------
+        os.system("rio rasterize /home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/test.tif --res 0.0167 < /home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/geojson_test.json")
+
+        # 3 - visualisation
+        raster1=rio.open("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/test.tif")
+        raster1.meta
+        plt.imshow(raster1.read(1))
+        plt.show()
 
     # final_sf.plot(column='spe_rich')
     # plt.show()
 
     print("----------> Year " + str(year) + " DONE !")
 
-    # update GEOdataframe with species richness and list of species
-    # -------------------------------------------------------------
 
-    global_spe_rich=pd.concat([global_spe_rich, final_sf])
 
-    # rasterization for each year for the EBV map
-    # -------------------------------------------
 
-    data2 = final_sf.drop(columns=["spe_list"])
-    data2.spe_rich.min()
-    data2.spe_rich.max()
-    data2.spe_rich.describe()
-
-    # 1- from geodf to geojson
-    # geoj=data2.to_json()
-    data2.to_file("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/geojson_test.json", driver="GeoJSON")
-    # 2 - from geojson to raster with rasterio
-    os.system("rio rasterize /home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/test.tif --res 0.0167 < /home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/geojson_test.json")
-    # 3 - mask with qc polygon
-    os.system("rio mask /home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/test.tif /home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/test_crop.tif --crop --geojson-mask - < /home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/qc_poly.json")
-    # 3 - visualisation
-    raster1=rio.open("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/test.tif")
-    raster1.meta
-    raster1_crop=rio.open("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/test_crop.tif")
-    raster1_crop.meta
 
 # Visual explo
 fig, (ax1, ax2) = plt.subplots(1,2)
