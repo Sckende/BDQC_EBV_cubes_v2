@@ -20,10 +20,11 @@ atlas_local <- function(parquet_file,
 }
 
 atlas <- atlas_local(
-    paste0(data_path, "/atlas_2024-05-29.parquet"),
+    "/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/atlas_2024-07-09.parquet",
     "atlas"
 )
 dim(atlas)
+colnames(atlas)
 
 # Check if obs only within Qc
 atlas |>
@@ -308,3 +309,22 @@ alces_sf_2000 <- alces_sf[alces_sf$year_obs == "2000", ]
 plot(st_geometry(alces_sf_2000))
 summary(as.numeric(alces_df$latitude))
 dim(alces_df[alces_df$year_obs == "2000" & as.numeric(alces_df$latitude) == -90, ])
+
+
+#### Test pour rasterisation ####
+library(terra)
+library(sf)
+
+ecoz <- st_read("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/qc_polygons/qc_ecozones.gpkg")
+bb <- st_bbox(ecoz)
+
+r <- rast(
+    xmin = bb[1],
+    xmax = bb[3],
+    ymin = bb[2],
+    ymax = bb[4],
+    resolution = 1000
+)
+
+mapview::mapview(r)
+terra::plot(r)

@@ -9,12 +9,12 @@ d.sql("INSTALL spatial; LOAD spatial")
 d.sql("INSTALL https; LOAD https")
 
 # Lecture Atlas (parquet) local 
-atlas = d.read_parquet("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/atlas_2024-07-08.parquet")
+# atlas = d.read_parquet("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/atlas_2024-07-08.parquet")
 
 # Lecture Atlas en remote
 d.sql("CREATE SECRET secret1 (TYPE S3, KEY_ID 'NJBPPQZX7PFUBP1LH8B0', SECRET 'DVQZTIQYUBxqs0nwtfA4n1meL8Fv9w977pSp8Gjc', URL_STYLE path, ENDPOINT 'object-arbutus.cloud.computecanada.ca')")
 # d.sql("CREATE TABLE atlas AS SELECT * FROM 's3://bq-io/atlas/parquet/atlas_2024-05-29.parquet'") # parquet file
-d.sql("CREATE TABLE atlas_sf AS SELECT * FROM 's3://bq-io/atlas/parquet/atlas_2024-07-09.parquet'") # GEOparquet file
+d.sql("CREATE TABLE atlas_sf AS SELECT * FROM 's3://bq-io/atlas/parquet/atlas_2024-07-16.parquet'") # GEOparquet file
 d.sql("SELECT DISTINCT year_obs FROM atlas_sf")
 d.sql("SELECT group_en, COUNT(group_en) FROM atlas_sf GROUP BY group_en")
 d.sql("SELECT group_fr, COUNT(group_fr) FROM atlas_sf GROUP BY group_fr")
@@ -41,9 +41,10 @@ d.sql("SELECT COLUMN_NAME from information_schema.columns WHERE table_name = 'at
 d.sql("SELECT * FROM atlas_sf").show(max_width=280)
 
 d.sql("SHOW qc_pix")
+d.sql("SHOW atlas_sf")
 
 # --> loop creation
-for year in range(1900, 2024):
+for year in range(1900, 1901):
     print("---------------------------------------------->" + str(year))
     qu = "CREATE TABLE atlas_pix AS SELECT atlas_sf.valid_scientific_name, atlas_sf.longitude, atlas_sf.latitude, atlas_sf.year_obs, atlas_sf.month_obs, atlas_sf.day_obs, atlas_sf.group_en, atlas_sf.kingdom, atlas_sf.phylum, atlas_sf.class, atlas_sf.order, atlas_sf.family, atlas_sf.genus, qc_pix.ID AS pix_id, qc_pix.geom AS geometry, to_binary(qc_pix.geom) AS geometry_text FROM atlas_sf, qc_pix WHERE atlas_sf.year_obs == " + str(year) + " AND ST_Intersects(atlas_sf.geometry, qc_pix.geom)"
     print(qu)
@@ -115,10 +116,11 @@ plt.show()
 
 global_spe_rich=geopd.GeoDataFrame(columns=["pix_id", "spe_rich", "spe_list", "group_en", "year"])
 
-taxa_group=["Bryophytes", "Other plants", "Amphibians"]
+taxa_group = ["Unknown", "Amphibians", "Birds", "Other taxons", "Reptiles", "Fungi", "Angiosperms", "Vascular cryptogam", "Mammals", "Algae", "Other invertebrates", "Bryophytes", "Other plants", "Fish", "Arthropods", "Conifers", "Tunicates"]
 
-# for year in range(1900, 2024):
-for year in range(2020, 2024):
+for year in range(1900, 2024):
+# for year in range(2020, 2024):
+    print(year)
     # for taxa in taxa_group:
     #     print(year, taxa)
     data_path=init_path + "atlas_pix_parquet/atlas_pix_" + str(year) + ".parquet"
@@ -136,24 +138,33 @@ for year in range(2020, 2024):
     # -------------------------------------------------------------
     global_spe_rich=pd.concat([global_spe_rich, info_pix])
 
+# create a geopackage per year per taxo
+for year in range(1900, 1901):
+    taxa_pres = global_spe_rich.group_en[global_spe_rich['year'] == year].unique()
+    print(taxa_pres)
+    for group in taxa_pres:
+        # df = global_spe_rich[(global_spe_rich['year'] == year) & (global_spe_rich['group_en'] == group)]
+        print(group)
+    
+
     # rasterization for each year for each taxonomic group
     # ---------------------------------------------------
 
     # 1 - left join to get information for all pixels per taxo group
     # --------------------------------------------------------------
-    data2 = info_pix.drop(columns=["spe_list"])
+    # data2 = info_pix.drop(columns=["spe_list"])
 
-    for group in taxa_group:
+    # for group in taxa_group:
             
-        data_group = data2[data2["group_en"] == group]
-        data_group_join = qc_pix.merge(data_group, how='left', on='pix_id')
-        data_group_join['spe_rich'] = data_group_join['spe_rich'].fillna(0)
-        data_group_join['year'] = data_group_join['year'].fillna(year)
+    #     data_group = data2[data2["group_en"] == group]
+    #     data_group_join = qc_pix.merge(data_group, how='left', on='pix_id')
+    #     data_group_join['spe_rich'] = data_group_join['spe_rich'].fillna(0)
+    #     data_group_join['year'] = data_group_join['year'].fillna(year)
         
-        data_group_join.plot(column = "spe_rich")
-        plt.show()
+    #     data_group_join.plot(column = "spe_rich")
+    #     plt.show()
 # test avec utilisation geopackage
-        data_group_join.to_file("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/birds_2020.gpkg", driver = "GPKG")
+        # data_group_join.to_file("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/qc_pix_rs_all_taxa.gpkg", driver = "GPKG")
 
 
 
@@ -162,9 +173,9 @@ for year in range(2020, 2024):
 
 
 #### ===> reprendre ici pour la rasterisation
-        shapes = ((geom,value) for geom, value in zip(data_group_join.geometry, data_group_join["spe_rich"]))
+        # shapes = ((geom,value) for geom, value in zip(data_group_join.geometry, data_group_join["spe_rich"]))
 
-        raster = rasterio.features.rasterize(shapes = shapes, out_shape = )
+        # raster = rasterio.features.rasterize(shapes = shapes, out_shape = )
         # data_group_join.spe_rich.min()
         # data_group_join.spe_rich.max()
         # data_group_join.spe_rich.describe()
@@ -176,17 +187,17 @@ for year in range(2020, 2024):
         # 3 - from geodf to geojson
         # -------------------------
         # geoj=data2.to_json()
-        group_sf.to_file("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/geojson_test.json", driver="GeoJSON")
+        # group_sf.to_file("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/geojson_test.json", driver="GeoJSON")
 
         # 4 - from geojson to raster with rasterio
         # ----------------------------------------
-        os.system("rio rasterize /home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/test.tif --res 0.0167 < /home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/geojson_test.json")
+        # os.system("rio rasterize /home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/test.tif --res 0.0167 < /home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/geojson_test.json")
 
         # 3 - visualisation
-        raster1=rio.open("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/test.tif")
-        raster1.meta
-        plt.imshow(raster1.read(1))
-        plt.show()
+        # raster1=rio.open("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/test.tif")
+        # raster1.meta
+        # plt.imshow(raster1.read(1))
+        # plt.show()
 
     # final_sf.plot(column='spe_rich')
     # plt.show()
