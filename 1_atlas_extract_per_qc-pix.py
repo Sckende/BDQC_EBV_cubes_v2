@@ -12,17 +12,18 @@ d.sql("INSTALL https; LOAD https")
 # atlas = d.read_parquet("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/atlas_2024-07-08.parquet")
 
 # Lecture Atlas en remote
-d.sql("CREATE SECRET secret1 (TYPE S3, KEY_ID 'NJBPPQZX7PFUBP1LH8B0', SECRET 'DVQZTIQYUBxqs0nwtfA4n1meL8Fv9w977pSp8Gjc', URL_STYLE path, ENDPOINT 'object-arbutus.cloud.computecanada.ca')")
+d.sql("CREATE SECRET secret1 (TYPE S3, KEY_ID 'xx', SECRET 'xxx', URL_STYLE path, ENDPOINT 'object-arbutus.cloud.computecanada.ca')")
 # d.sql("CREATE TABLE atlas AS SELECT * FROM 's3://bq-io/atlas/parquet/atlas_2024-05-29.parquet'") # parquet file
-d.sql("CREATE TABLE atlas_sf AS SELECT * FROM 's3://bq-io/atlas/parquet/atlas_2024-07-16.parquet'") # GEOparquet file
+# d.sql("CREATE TABLE atlas_sf AS SELECT * FROM 's3://bq-io/atlas/parquet/atlas_2024-07-16.parquet'") # GEOparquet file
 d.sql("SELECT DISTINCT year_obs FROM atlas_sf")
+d.sql("SELECT geom FROM atlas_sf")
 d.sql("SELECT group_en, COUNT(group_en) FROM atlas_sf GROUP BY group_en")
 d.sql("SELECT group_fr, COUNT(group_fr) FROM atlas_sf GROUP BY group_fr")
 
 # d.sql("DROP SECRET secret1")
 
 # Conversion en objet spatial
-d.sql("CREATE TABLE atlas_sf AS SELECT *, ST_Point(CAST(longitude as float), CAST(latitude as float)) AS geometry, FROM atlas")
+# d.sql("CREATE TABLE atlas_sf AS SELECT *, ST_Point(CAST(longitude as float), CAST(latitude as float)) AS geometry, FROM atlas")
 
 # Lecture qc-pix (geopackage)
 d.sql("CREATE TABLE qc_pix AS SELECT * FROM ST_Read('/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/qc_polygons/qc_grid_1x1km_finale_latlon.gpkg')")
