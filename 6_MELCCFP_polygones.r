@@ -10,6 +10,7 @@
 #### Packages
 library(sf)
 library(terra)
+library(rmapshaper)
 
 #### Custom functions
 accentless <- function(s) {
@@ -91,10 +92,10 @@ lapply(melccfp, function(x) { #
 
 #### Creation des cartes de RS par groupe/sous-groupe(?) taxonomique
 # retrieve the species names
-system("AWS_ACCESS_KEY_ID=NJBPPQZX7PFUBP1LH8B0 AWS_SECRET_ACCESS_KEY=DVQZTIQYUBxqs0nwtfA4n1meL8Fv9w977pSp8Gjc S3_ENDPOINT_URL=https://object-arbutus.cloud.computecanada.ca s5cmd ls s3://bq-io/acer/melccfp/reptiles/ > melccfp_reptiles_species.txt")
-system("AWS_ACCESS_KEY_ID=NJBPPQZX7PFUBP1LH8B0 AWS_SECRET_ACCESS_KEY=DVQZTIQYUBxqs0nwtfA4n1meL8Fv9w977pSp8Gjc S3_ENDPOINT_URL=https://object-arbutus.cloud.computecanada.ca s5cmd ls s3://bq-io/acer/melccfp/mammiferes/ > melccfp_mammiferes_species.txt")
-system("AWS_ACCESS_KEY_ID=NJBPPQZX7PFUBP1LH8B0 AWS_SECRET_ACCESS_KEY=DVQZTIQYUBxqs0nwtfA4n1meL8Fv9w977pSp8Gjc S3_ENDPOINT_URL=https://object-arbutus.cloud.computecanada.ca s5cmd ls s3://bq-io/acer/melccfp/poissons/ > melccfp_poissons_species.txt")
-system("AWS_ACCESS_KEY_ID=NJBPPQZX7PFUBP1LH8B0 AWS_SECRET_ACCESS_KEY=DVQZTIQYUBxqs0nwtfA4n1meL8Fv9w977pSp8Gjc S3_ENDPOINT_URL=https://object-arbutus.cloud.computecanada.ca s5cmd ls s3://bq-io/acer/melccfp/amphibiens/ > melccfp_amphibiens_species.txt")
+# system("AWS_ACCESS_KEY_ID=xxx AWS_SECRET_ACCESS_KEY=xxx S3_ENDPOINT_URL=https://object-arbutus.cloud.computecanada.ca s5cmd ls s3://bq-io/acer/melccfp/reptiles/ > melccfp_reptiles_species.txt")
+# system("AWS_ACCESS_KEY_ID=xxx AWS_SECRET_ACCESS_KEY=xxx S3_ENDPOINT_URL=https://object-arbutus.cloud.computecanada.ca s5cmd ls s3://bq-io/acer/melccfp/mammiferes/ > melccfp_mammiferes_species.txt")
+# system("AWS_ACCESS_KEY_ID=xxx AWS_SECRET_ACCESS_KEY=xxx S3_ENDPOINT_URL=https://object-arbutus.cloud.computecanada.ca s5cmd ls s3://bq-io/acer/melccfp/poissons/ > melccfp_poissons_species.txt")
+# system("AWS_ACCESS_KEY_ID=xxx AWS_SECRET_ACCESS_KEY=xxx S3_ENDPOINT_URL=https://object-arbutus.cloud.computecanada.ca s5cmd ls s3://bq-io/acer/melccfp/amphibiens/ > melccfp_amphibiens_species.txt")
 
 spe_poiss <- read.table("melccfp_poissons_species.txt", h = F)[, 4]
 spe_mamm <- read.table("melccfp_mammiferes_species.txt", h = F)[, 4]
@@ -117,6 +118,7 @@ for (l in 1:length(spe_list)) {
     print(paste0("-----> Processing start for ", group_name))
     ras <- rast(spe_path)
     rs <- sum(ras, na.rm = T)
+    rs <- project(rs, "epsg:4326")
 
     # send the raster to s3
     path_s3 <- paste0("s3://bq-io/acer/ebv/rs_melccfp_", group_name, ".tif")
