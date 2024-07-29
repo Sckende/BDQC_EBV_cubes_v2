@@ -318,13 +318,62 @@ library(sf)
 ecoz <- st_read("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/qc_polygons/qc_ecozones.gpkg")
 bb <- st_bbox(ecoz)
 
-r <- rast(
+ref_ras <- rast(
     xmin = bb[1],
     xmax = bb[3],
     ymin = bb[2],
     ymax = bb[4],
     resolution = 1000
 )
+crs(ref_ras) <- "epsg:32198"
+values(ref_ras) <- 1
+ref_ras_ll <- terra::project(ref_ras, "epsg:4326")
+
+library(arrow)
+y <- read_parquet("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/rasterisation/2023_Birds_rs.parquet")
+names(y)
+class(y)
+
+y$geometry <- st_as_sfc(y$geometry)
+y <- st_as_sf(y,
+    sf_column_name = "geometry",
+    crs = 4326
+)
+names(y)
+class(y)
+plot(st_geometry(y))
+
+# rasterisation
+# rp <- rasterize(y, ref_ras, "NOM_FRANCA")
+rp <- rasterize(y, ref_ras_ll, "spe_rich", touches = TRUE, fun = "mean") # for fun argument, mean value of RS if two polygons are touched by a pixel
 
 mapview::mapview(r)
-terra::plot(r)
+terra::plot(rp)
+
+
+
+x11()
+plot(st_geometry(y))
+x11()
+terra::plot(rp, col = "black")
+
+
+
+
+df <- data.frame(feature = 1:10, X = rnorm(10), Y = rnorm(10))
+st_as_sf(df, coords = c("X", "Y"))
+
+
+sf <-
+    df %>%
+    rowwise() %>%
+    mutate(geometry = st_geometry(st_point(c(X, Y)))) %>%
+    select(-X, -Y) %>%
+    ungroup()
+
+st_as_sf(sf, sf_column_name = "geometry")
+
+?st_cast
+y$geom <- gsub("POLYGON ", "", y$geometry)
+class(geom)
+st_as_sfc(y$geometry)

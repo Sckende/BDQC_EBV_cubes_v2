@@ -1,6 +1,9 @@
 import duckdb as d
 import os
 
+import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 
 # Load spatial extension
@@ -12,18 +15,18 @@ d.sql("INSTALL https; LOAD https")
 # atlas = d.read_parquet("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/atlas_2024-07-08.parquet")
 
 # Lecture Atlas en remote
-d.sql("CREATE SECRET secret1 (TYPE S3, KEY_ID 'xx', SECRET 'xxx', URL_STYLE path, ENDPOINT 'object-arbutus.cloud.computecanada.ca')")
+d.sql("CREATE SECRET secret1 (TYPE S3, KEY_ID 'NJBPPQZX7PFUBP1LH8B0', SECRET 'DVQZTIQYUBxqs0nwtfA4n1meL8Fv9w977pSp8Gjc', URL_STYLE path, ENDPOINT 'object-arbutus.cloud.computecanada.ca')")
 # d.sql("CREATE TABLE atlas AS SELECT * FROM 's3://bq-io/atlas/parquet/atlas_2024-05-29.parquet'") # parquet file
-# d.sql("CREATE TABLE atlas_sf AS SELECT * FROM 's3://bq-io/atlas/parquet/atlas_2024-07-16.parquet'") # GEOparquet file
-d.sql("SELECT DISTINCT year_obs FROM atlas_sf")
-d.sql("SELECT geom FROM atlas_sf")
-d.sql("SELECT group_en, COUNT(group_en) FROM atlas_sf GROUP BY group_en")
-d.sql("SELECT group_fr, COUNT(group_fr) FROM atlas_sf GROUP BY group_fr")
+d.sql("CREATE TABLE atlas AS SELECT * FROM 's3://bq-io/atlas/parquet/atlas_2024-07-16.parquet'") # GEOparquet file
+d.sql("SELECT DISTINCT year_obs FROM atlas")
+d.sql("SELECT geom FROM atlas")
+d.sql("SELECT group_en, COUNT(group_en) FROM atlas GROUP BY group_en")
+d.sql("SELECT group_fr, COUNT(group_fr) FROM atlas GROUP BY group_fr")
 
 # d.sql("DROP SECRET secret1")
 
 # Conversion en objet spatial
-# d.sql("CREATE TABLE atlas_sf AS SELECT *, ST_Point(CAST(longitude as float), CAST(latitude as float)) AS geometry, FROM atlas")
+d.sql("CREATE TABLE atlas_sf AS SELECT *, ST_Point(CAST(longitude as float), CAST(latitude as float)) AS geometry, FROM atlas") # cause geom is in blob format
 
 # Lecture qc-pix (geopackage)
 d.sql("CREATE TABLE qc_pix AS SELECT * FROM ST_Read('/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/qc_polygons/qc_grid_1x1km_finale_latlon.gpkg')")
@@ -45,7 +48,7 @@ d.sql("SHOW qc_pix")
 d.sql("SHOW atlas_sf")
 
 # --> loop creation
-for year in range(1900, 1901):
+for year in range(1900, 2023):
     print("---------------------------------------------->" + str(year))
     qu = "CREATE TABLE atlas_pix AS SELECT atlas_sf.valid_scientific_name, atlas_sf.longitude, atlas_sf.latitude, atlas_sf.year_obs, atlas_sf.month_obs, atlas_sf.day_obs, atlas_sf.group_en, atlas_sf.kingdom, atlas_sf.phylum, atlas_sf.class, atlas_sf.order, atlas_sf.family, atlas_sf.genus, qc_pix.ID AS pix_id, qc_pix.geom AS geometry, to_binary(qc_pix.geom) AS geometry_text FROM atlas_sf, qc_pix WHERE atlas_sf.year_obs == " + str(year) + " AND ST_Intersects(atlas_sf.geometry, qc_pix.geom)"
     print(qu)
@@ -57,12 +60,23 @@ for year in range(1900, 1901):
     # Write the new db
     # ici passe par un csv puis un parquet avec GDAL car incapable de recuperer les geometries au format blob quand on cree un parquet avec SQL
     # qu2 = "COPY (SELECT * FROM atlas_pix) TO 'atlas_pix_parquet/atlas_pix_" + str(year) + ".parquet' (FORMAT 'parquet')"
-    qu2 = "COPY (SELECT * FROM atlas_pix) TO '/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/atlas_pix_parquet/atlas_pix_" + str(year) + ".csv' CSV HEADER DELIMITER ','"
+    path = "'/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/atlas_pix_parquet/atlas_pix_" + str(year) + ".csv'"
+    qu2 = "COPY (SELECT * FROM atlas_pix) TO " + path + " CSV HEADER DELIMITER ','"
     d.sql(qu2)
     d.sql("DROP TABLE atlas_pix")
 
-    req = "ogr2ogr -f Parquet -s_srs EPSG:4326 -t_srs EPSG:4326 /home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/atlas_pix_parquet/atlas_pix_" + str(year) + ".parquet /home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/atlas_pix_parquet/atlas_pix_" + str(year) + ".csv"
-    os.system(req)
+    # necessite conda forge qui rentre en conflit avec d'autres package dans R (necessite de gerer les environnements python)
+    # req = "ogr2ogr -f Parquet -s_srs EPSG:4326 -t_srs EPSG:4326 /home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/atlas_pix_parquet/atlas_pix_" + str(year) + ".parquet /home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/atlas_pix_parquet/atlas_pix_" + str(year) + ".csv"
+    # os.system(req)
+
+    # utilisation de pandas
+    path_csv = "/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/atlas_pix_parquet/atlas_pix_" + str(year) + ".csv"
+    parquet_path = "/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/atlas_pix_parquet/atlas_pix_" + str(year) + ".parquet"
+
+    df = pd.read_csv(path_csv)
+    table = pa.Table.from_pandas(df)
+    pq.write_table(table, parquet_path)
+
     os.system("rm /home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/atlas_pix_parquet/*.csv")
 
 
@@ -102,6 +116,8 @@ from rasterio import features
 from rasterio.enums import MergeAlg
 from rasterio.mask import mask
 from numpy import int16  
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 init_path="/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/"
 
@@ -117,7 +133,7 @@ plt.show()
 
 global_spe_rich=geopd.GeoDataFrame(columns=["pix_id", "spe_rich", "spe_list", "group_en", "year"])
 
-taxa_group = ["Unknown", "Amphibians", "Birds", "Other taxons", "Reptiles", "Fungi", "Angiosperms", "Vascular cryptogam", "Mammals", "Algae", "Other invertebrates", "Bryophytes", "Other plants", "Fish", "Arthropods", "Conifers", "Tunicates"]
+taxa_group = ["Unknown", "Amphibians", "Arthropods", "Conifers", "Fish", "Tunicates", "Birds", "Other taxons","Reptiles", "Mammals", "Other invertebrates", "Algae", "Bryophytes", "Other plants", "Fungi", "Angiosperms", "Vascular cryptogam"]
 
 for year in range(1900, 2024):
 # for year in range(2020, 2024):
@@ -139,71 +155,39 @@ for year in range(1900, 2024):
     # -------------------------------------------------------------
     global_spe_rich=pd.concat([global_spe_rich, info_pix])
 
-# create a geopackage per year per taxo
-for year in range(1900, 1901):
+# create a parquet per year per taxo
+for year in range(1900, 2024):
     taxa_pres = global_spe_rich.group_en[global_spe_rich['year'] == year].unique()
     print(taxa_pres)
     for group in taxa_pres:
-        # df = global_spe_rich[(global_spe_rich['year'] == year) & (global_spe_rich['group_en'] == group)]
-        print(group)
-    
+        df = global_spe_rich[(global_spe_rich['year'] == year) & (global_spe_rich['group_en'] == group)]
+        print(df)
 
-    # rasterization for each year for each taxonomic group
-    # ---------------------------------------------------
+        # 1 - left join to get information for all pixels per taxo group
+        # --------------------------------------------------------------
+        data2 = df.drop(columns=["spe_list"])
+        data_join = data2.merge(qc_pix, how='left', on='pix_id') # inverser ici les deux DF si on veut tous les polygones de 1x1km
 
-    # 1 - left join to get information for all pixels per taxo group
-    # --------------------------------------------------------------
-    # data2 = info_pix.drop(columns=["spe_list"])
-
-    # for group in taxa_group:
-            
-    #     data_group = data2[data2["group_en"] == group]
-    #     data_group_join = qc_pix.merge(data_group, how='left', on='pix_id')
-    #     data_group_join['spe_rich'] = data_group_join['spe_rich'].fillna(0)
-    #     data_group_join['year'] = data_group_join['year'].fillna(year)
+        csv_path = "/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/rasterisation/" + str(year) + "_" + str(group).replace(" ", "_") + "_rs" + ".csv"
+        pq_path = "/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/rasterisation/" + str(year) + "_" + str(group).replace(" ", "_") + "_rs" + ".parquet"
         
-    #     data_group_join.plot(column = "spe_rich")
-    #     plt.show()
-# test avec utilisation geopackage
-        # data_group_join.to_file("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/qc_pix_rs_all_taxa.gpkg", driver = "GPKG")
+        # extra step to avoid pb with pyarrow
+        data_join.to_csv(csv_path)
+        dfpq = pd.read_csv(csv_path)
+
+        # conversion to pq
+        table_for_pq = pa.Table.from_pandas(dfpq)
+        pq.write_table(table_for_pq, pq_path)
+
+        # detlete extra files
+        cmd = "rm " + csv_path
+        os.system(cmd)
+
+# =========> suite rasterisation, dans R
 
 
 
 
-
-
-
-#### ===> reprendre ici pour la rasterisation
-        # shapes = ((geom,value) for geom, value in zip(data_group_join.geometry, data_group_join["spe_rich"]))
-
-        # raster = rasterio.features.rasterize(shapes = shapes, out_shape = )
-        # data_group_join.spe_rich.min()
-        # data_group_join.spe_rich.max()
-        # data_group_join.spe_rich.describe()
-
-        # 2 - conversion to geodataframe
-        # ------------------------------
-        group_sf=geopd.GeoDataFrame(data_group_join, geometry = "geometry", crs = "EPSG:4326")
-
-        # 3 - from geodf to geojson
-        # -------------------------
-        # geoj=data2.to_json()
-        # group_sf.to_file("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/geojson_test.json", driver="GeoJSON")
-
-        # 4 - from geojson to raster with rasterio
-        # ----------------------------------------
-        # os.system("rio rasterize /home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/test.tif --res 0.0167 < /home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/geojson_test.json")
-
-        # 3 - visualisation
-        # raster1=rio.open("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/data_test/test.tif")
-        # raster1.meta
-        # plt.imshow(raster1.read(1))
-        # plt.show()
-
-    # final_sf.plot(column='spe_rich')
-    # plt.show()
-
-    print("----------> Year " + str(year) + " DONE !")
 
 
 

@@ -84,7 +84,7 @@ lapply(melccfp, function(x) { #
             gdal = "COMPRESS=DEFLATE",
             overwrite = TRUE
         )
-        bash <- paste("AWS_ACCESS_KEY_ID=NJBPPQZX7PFUBP1LH8B0 AWS_SECRET_ACCESS_KEY=DVQZTIQYUBxqs0nwtfA4n1meL8Fv9w977pSp8Gjc S3_ENDPOINT_URL=https://object-arbutus.cloud.computecanada.ca s5cmd cp -acl public-read", path, path_s3, sep = " ")
+        bash <- paste("AWS_ACCESS_KEY_ID=xxx AWS_SECRET_ACCESS_KEY=xxx S3_ENDPOINT_URL=https://object-arbutus.cloud.computecanada.ca s5cmd cp -acl public-read", path, path_s3, sep = " ")
         system(bash)
         system(paste("rm", path))
     })
@@ -131,7 +131,7 @@ for (l in 1:length(spe_list)) {
         gdal = "COMPRESS=DEFLATE",
         overwrite = TRUE
     )
-    bash <- paste("AWS_ACCESS_KEY_ID=NJBPPQZX7PFUBP1LH8B0 AWS_SECRET_ACCESS_KEY=DVQZTIQYUBxqs0nwtfA4n1meL8Fv9w977pSp8Gjc S3_ENDPOINT_URL=https://object-arbutus.cloud.computecanada.ca s5cmd cp -acl public-read", path, path_s3, sep = " ")
+    bash <- paste("AWS_ACCESS_KEY_ID=xxx AWS_SECRET_ACCESS_KEY=xxx S3_ENDPOINT_URL=https://object-arbutus.cloud.computecanada.ca s5cmd cp -acl public-read", path, path_s3, sep = " ")
     system(bash)
     system(paste("rm", path))
 }
