@@ -17,7 +17,7 @@ for (year in 1993:2017) {
     print(paste0("--------------------> YEAR ", year))
     rast_tot <- c()
     for (i in 1:length(species$species)) {
-        path <- paste0("https://object-arbutus.cloud.computecanada.ca/bq-io/acer/TdeB_benchmark_SDM/oiseaux-nicheurs-qc/", species[i, 1], "_range_", year, ".tif")
+        path <- paste0("https://object-arbutus.cloud.computecanada.ca/bq-io/acer/oiseaux-nicheurs-qc/", species[i, 1], "_range_", year, ".tif")
 
         if (url.exists(path)) {
             map <- rast(path)
