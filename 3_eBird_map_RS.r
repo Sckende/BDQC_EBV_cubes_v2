@@ -52,3 +52,11 @@ leaflet() %>%
     addTiles() %>%
     addRasterImage(rast, colors = pal3, opacity = 0.8) %>%
     addLegend(pal = pal3, values = values(rast), title = "Richesse spécifique")
+
+#### Pour envoi dans stac catalogue ####
+# conversion en Quebec Albers (projection conique equal area)
+
+r <- rast("/vsicurl/https://object-arbutus.cloud.computecanada.ca/bq-io/acer/ebv/rs_ebird.tif")
+repj <- terra::project(r, "EPSG:6623")
+
+writeRaster(repj, "/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/GITHUB/io-data/bqio/data/rs_ebird.tif", overwrite = T)
