@@ -81,9 +81,9 @@ f1 <- read_stars(href_ls[1])
 f2 <- read_stars(href_ls[2])
 new <- c(f1, f2)
 
-r_stars <- read_stars(c(href_ls[1], href_ls[2]), proxy = TRUE, along = "band") # argument along is for determining how several arrays are combined
+r_stars <- read_stars(c(href_ls[1], href_ls[2], href_ls[3]), proxy = TRUE, along = "attr") # argument along is for determining how several arrays are combined
 r_stars |>
-    slice(index = 1, along = "band") |>
+    slice(index = 1, along = "attr") |>
     plot()
 
 
