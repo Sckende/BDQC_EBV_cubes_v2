@@ -12,7 +12,7 @@ acer <- stac("https://acer.biodiversite-quebec.ca/stac/")
 io <- stac("https://io.biodiversite-quebec.ca/stac/")
 
 # Liste des collections contenues dans le catalogue
-collections <- s_obj |>
+collections <- acer |>
     collections() |>
     get_request()
 
@@ -58,7 +58,7 @@ for (i in 1:length(stac_items$features)) {
 }
 
 # visualisation de l'item #100 avec le package STARS
-it <- read_stars(paste0("/vsicurl/", stac_items[["features"]][[100]]$assets$data$href), proxy = TRUE)
+it <- read_stars(paste0("/vsicurl/", stac_items[["features"]][[80]]$assets$data$href), proxy = TRUE)
 plot(it)
 
 # Calcul de la richesse specifique a l'echelle du qc
@@ -71,6 +71,80 @@ for (i in 1:length(stac_items$features)) {
 ras <- rast(href_ls)
 ras2 <- sum(ras)
 plot(ras2)
+
+#### FUNCTION pour extraire richesse specifique dans le temps a l'echelle du QC ####
+sr_trend <- function(catalog = "acer", collection = "oiseaux-nicheurs-qc", years = NULL) {
+    stac_cat <- stac(paste0("https://", catalog, ".biodiversite-quebec.ca/stac/"))
+    # spe_num_df <- data.frame(year = numeric(), spe_rich = numeric())
+    spe_num_df <- tibble(year = numeric(), spe_rich = numeric(), spe_ls = list())
+
+
+    if (is.null(years)) {
+        print("Computation for full time range - from 1992 to 2015 - quiet long ")
+        years <- 1992:2017
+    }
+
+    for (i in years) {
+        print(i)
+        stac_items <- stac_cat |>
+            ext_filter(
+                collection == collection &&
+                    `map` %in% c("range") &&
+                    `year` == {{ i }}
+            ) |>
+            get_request() |>
+            items_fetch()
+
+        spe_num <- stac_items |>
+            items_length()
+
+        spe_ls <- NULL
+        for (j in 1:spe_num) {
+            spe <- stac_items$features[[j]]$properties$species
+            spe_ls <- c(spe_ls, spe)
+        }
+
+
+        spe_num_df <- rbind(spe_num_df, tibble(year = i, spe_rich = spe_num, spe_ls = list(spe_ls)))
+    }
+
+    spe_num_df
+}
+
+
+sr_trend()
+sr_trend(years = 1995)
+sr_trend(years = 2011:2015)
+
+
+#### fonction pour calcul de RS dans le temps pour un polygone donne ####
+# see https://rdrr.io/cran/gdalcubes/man/extract_geom.html
+ecod <- st_read("https://object-arbutus.cloud.computecanada.ca/bq-io/acer/qc_polygons/sf_eco_poly/qc_ecodistricts.gpkg")
+ecod <- rmapshaper::ms_simplify(ecod)
+poly <- ecod[70, ]
+
+# def de la bbox
+poly_bbox <- poly |>
+    sf::st_transform(32198) |>
+    sf::st_bbox()
+
+poly_bbox_geojson <- rstac::cql2_bbox_as_geojson(poly_bbox)
+poly_bbox_geojson
+
+# filtrage des collection
+poly_item <- acer |>
+    ext_filter(
+        collection %in% c("oiseaux-nicheurs-qc") &&
+            `map` %in% c("range") &&
+            `species` == "Zonotrichia leucophrys" &&
+            `year` == 1992
+    ) |>
+    get_request() |>
+    items_fetch()
+
+
+
+
 
 # Pour optimisation et calcul selon des polygones
 # ==> see stars package https://r-spatial.github.io/stars/
