@@ -123,6 +123,20 @@ ecod <- st_read("https://object-arbutus.cloud.computecanada.ca/bq-io/acer/qc_pol
 ecod <- rmapshaper::ms_simplify(ecod)
 poly <- ecod[70, ]
 
+plot(st_geometry(ecod))
+plot(st_geometry(poly), col = "grey", add = T)
+
+# vireos <- rast("/home/claire/desktop/vireo_data_test/vireo_single_file.tif")
+range2017 <- rast("/home/claire/desktop/vireo_data_test/2017_range_single_file.tif")
+
+
+ext <- extract(range2017, vect(poly))
+max_ext <- apply(ext, 2, max)
+names(max_ext)[max_ext > 0][-1]
+
+
+
+
 # def de la bbox
 poly_bbox <- poly |>
     sf::st_transform(32198) |>
@@ -160,6 +174,9 @@ r_stars |>
     slice(index = 1, along = "attr") |>
     plot()
 
+# multiband file with gdalcubes
+
+vireo_col <- create_image_collection("/home/claire/desktop/vireo_data_test/vireo_single_file.tif")
 
 
 
@@ -168,6 +185,12 @@ r_stars |>
 
 
 
+vireos <- brick("/home/claire/desktop/vireo_data_test/vireo_single_file.tif")
+
+
+
+names(vireos)
+band
 
 
 
@@ -176,12 +199,7 @@ r_stars |>
 
 
 
-
-
-
-
-
-
+lc1
 
 bbox <- st_bbox(c(xmin = -76, xmax = -70, ymax = 54, ymin = 50), crs = st_crs(4326))
 lc2 <- lc1 |> st_crop(bbox)

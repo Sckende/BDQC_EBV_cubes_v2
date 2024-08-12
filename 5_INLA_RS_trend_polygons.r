@@ -49,17 +49,17 @@ obj <- catal %>%
     get_request()
 
 # Filtrer en fn des proprietes des items et creer une collection
-range_coll <- gdalcube::stac_image_collection(obj$features,
+range_coll <- gdalcubes::stac_image_collection(obj$features,
     asset_names = c("data"),
     property_filter = function(f) {
         f[["map"]] %in% c("range")
     }
 ) # ici f correspond a obj[['features']][[1]]$properties
 
-range_vireo_2017 <- stac_image_collection(obj$features,
+range_vireo_soli_2017 <- stac_image_collection(obj$features,
     asset_names = c("data"),
     property_filter = function(f) {
-        f[["map"]] %in% c("range") & f[["year"]] == 2017 & str_detect(f[["species"]], "Vireo") == TRUE
+        f[["map"]] %in% c("range") & f[["year"]] == 2017 & str_detect(f[["species"]], "Vireo solitarius") == TRUE
     }
 )
 
@@ -67,8 +67,8 @@ range_vireo_2017 <- stac_image_collection(obj$features,
 # To create a regular raster data cube from the image collection, we define the geometry of our target cube as a data cube view, using the cube_view() function. We define a simple overview, covering the full spatiotemporal extent of the imagery at 1km x 1km pixel size where one data cube cell represents a duration of one year. The provided resampling and aggregation methods are used to spatially reproject, crop, and rescale individual images and combine pixel values from many images within one year respectively. The raster_cube() function returns a proxy object, i.e., it returns immediately without doing any expensive computations.
 
 cv <- cube_view(
-    extent = range_vireo_2017,
-    srs = "EPSG:4326", # ne fonctionne pas en utilisant 6623
+    extent = extent(range_vireo_soli_2017),
+    srs = "EPSG:6624",
     dt = "P1Y",
     dx = 10000,
     dy = 10000,
@@ -76,11 +76,14 @@ cv <- cube_view(
     resampling = "bilinear"
 )
 # Jumeler la collection et le cube_view pour créer un raster cube.
-ras_cub <- raster_cube(range_vireo_2017, cv)
+ras_cub <- raster_cube(range_vireo_soli_2017, cv)
 plot(ras_cub, zlim = c(0, 10000)) # raster entirement noir
 
+
+
+
 library(RColorBrewer)
-raster_cube(range_vireo_2017, cv) |>
+raster_cube(range_vireo_soli_2017, cv) |>
     select_bands(c("data")) |>
     apply_pixel(function(v) {
         sum(v)
