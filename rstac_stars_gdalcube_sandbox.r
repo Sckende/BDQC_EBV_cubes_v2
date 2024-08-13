@@ -6,7 +6,6 @@ library(stars)
 library(terra)
 library(dplyr)
 
-
 # Connexion au catalogue STAC ACER
 acer <- stac("https://acer.biodiversite-quebec.ca/stac/")
 io <- stac("https://io.biodiversite-quebec.ca/stac/")
@@ -119,20 +118,109 @@ sr_trend(years = 2011:2015)
 
 #### fonction pour calcul de RS dans le temps pour un polygone donne ####
 # see https://rdrr.io/cran/gdalcubes/man/extract_geom.html
+ecoz <- st_read("https://object-arbutus.cloud.computecanada.ca/bq-io/acer/qc_polygons/sf_eco_poly/qc_ecozones.gpkg")
+ecoz <- rmapshaper::ms_simplify(ecoz)
+
 ecod <- st_read("https://object-arbutus.cloud.computecanada.ca/bq-io/acer/qc_polygons/sf_eco_poly/qc_ecodistricts.gpkg")
 ecod <- rmapshaper::ms_simplify(ecod)
-poly <- ecod[70, ]
+poly <- ecod[10:11, ]
 
 plot(st_geometry(ecod))
 plot(st_geometry(poly), col = "grey", add = T)
 
 # vireos <- rast("/home/claire/desktop/vireo_data_test/vireo_single_file.tif")
-range2017 <- rast("/home/claire/desktop/vireo_data_test/2017_range_single_file.tif")
+range2017 <- rast("/home/claire/desktop/data/multiband/2017_range_multiband_renamed.tif")
+names(range2017)
 
 
 ext <- extract(range2017, vect(poly))
 max_ext <- apply(ext, 2, max)
 names(max_ext)[max_ext > 0][-1]
+
+sr_spat_temp_trend <- function(catalog = "acer", collection = "oiseaux-nicheurs-qc", years = NULL, polygon = NULL) {
+    if (!is(polygon, "sf") & !is.null(polygon)) {
+        stop("Polygon must be a sf object")
+    }
+    polygon$poly_id <- 1:nrow(polygon)
+
+    if (is.null(years)) {
+        print("Computation for full time range - from 1992 to 2015 - quiet long ")
+        years <- 1992:2017
+    }
+    if (min(years) < 1992 | max(years) > 2017) {
+        stop("Years have to be from 1992 to 2017")
+    }
+    # Empty df for storing the result
+    spe_num_df <- tibble(year = numeric(), spe_rich = numeric(), spe_ls = list(), poly_id = numeric())
+
+    for (p in 1:nrow(polygon)) {
+        poly <- polygon[p, ]
+        print(paste0("Computation for polygon  number ", p, " on ", nrow(polygon)))
+
+        for (y in years) {
+            # print(y)
+            # Retrieve the multi-band raster !!!! A MODIFIER QUAND FILES DANS ACER STAC !!!
+            multi <- rast(paste0("/home/claire/desktop/data/multiband/", y, "_range_multiband_renamed.tif"))
+
+            # extract raster values in polygon for each band
+            ext <- extract(multi, vect(poly))
+            max_ext <- apply(ext, 2, max)
+            spe_ls <- names(max_ext)[max_ext > 0][-1]
+            spe_num <- length(spe_ls)
+
+            # result
+            # spe_num_df <- rbind(spe_num_df, tibble(year = y, spe_rich = spe_num, spe_ls = list(spe_ls), poly_id = p, geom = polygon[p, "geom"]))
+            spe_num_df <- add_row(spe_num_df, year = y, spe_rich = spe_num, spe_ls = list(spe_ls), poly_id = p)
+        }
+    }
+
+    final <- left_join(spe_num_df, polygon[, c("poly_id", "geom")], by = c("poly_id"))
+    final
+}
+
+# Zone de test #
+sr_spat_temp_trend(polygon = ecod)
+sr_spat_temp_trend(years = 2000, polygon = ecod)
+rs <- sr_spat_temp_trend(years = c(1992, 2003, 2017), polygon = ecod)
+rs |> print(n = 303)
+
+rs_ls <- split(rs, rs$poly_id)
+sr_spat_temp_trend(years = 2019, polygon = poly)
+
+ecoz_rs <- sr_spat_temp_trend(polygon = ecoz)
+ecoz_rs_ls <- split(ecoz_rs, ecoz_rs$poly_id)
+
+x11()
+par(mfrow = c(3, 3))
+lapply(ecoz_rs_ls, function(x) {
+    plot(x$year, x$spe_rich, type = "l")
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
