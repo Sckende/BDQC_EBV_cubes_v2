@@ -129,13 +129,15 @@ plot(st_geometry(ecod))
 plot(st_geometry(poly), col = "grey", add = T)
 
 # vireos <- rast("/home/claire/desktop/vireo_data_test/vireo_single_file.tif")
-range2017 <- rast("/home/claire/desktop/data/multiband/2017_range_multiband_renamed.tif")
-names(range2017)
+range <- rast("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/inla_multiband/2017_range_multiband.tif")
+names(range)
+
+plot(range)
 
 
-ext <- extract(range2017, vect(poly))
-max_ext <- apply(ext, 2, max)
-names(max_ext)[max_ext > 0][-1]
+# ext <- extract(range2017, vect(poly))
+# max_ext <- apply(ext, 2, max)
+# names(max_ext)[max_ext > 0][-1]
 
 sr_spat_temp_trend <- function(catalog = "acer", collection = "oiseaux-nicheurs-qc", years = NULL, polygon = NULL) {
     if (!is(polygon, "sf") & !is.null(polygon)) {
@@ -160,7 +162,9 @@ sr_spat_temp_trend <- function(catalog = "acer", collection = "oiseaux-nicheurs-
         for (y in years) {
             # print(y)
             # Retrieve the multi-band raster !!!! A MODIFIER QUAND FILES DANS ACER STAC !!!
-            multi <- rast(paste0("/home/claire/desktop/data/multiband/", y, "_range_multiband_renamed.tif"))
+            # multi <- rast(paste0("/home/claire/desktop/data/multiband/", y, "_range_multiband_renamed.tif")) # yoga
+            multi <- rast(paste0("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/inla_multiband/", y, "_range_multiband_renamed.tif")) # xps
+
 
             # extract raster values in polygon for each band
             ext <- extract(multi, vect(poly))
