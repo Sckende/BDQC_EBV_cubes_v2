@@ -201,173 +201,131 @@ lapply(ecoz_rs_ls, function(x) {
 })
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# def de la bbox
-poly_bbox <- poly |>
-    sf::st_transform(32198) |>
-    sf::st_bbox()
-
-poly_bbox_geojson <- rstac::cql2_bbox_as_geojson(poly_bbox)
-poly_bbox_geojson
-
-# filtrage des collection
-poly_item <- acer |>
-    ext_filter(
-        collection %in% c("oiseaux-nicheurs-qc") &&
-            `map` %in% c("range") &&
-            `species` == "Zonotrichia leucophrys" &&
-            `year` == 1992
-    ) |>
-    get_request() |>
-    items_fetch()
-
-
-
-
-
-# Pour optimisation et calcul selon des polygones
-# ==> see stars package https://r-spatial.github.io/stars/
-# ==> see gdalcube package https://github.com/appelmar/gdalcubes
-# fusion des deux pour une solution !
-
-f1 <- read_stars(href_ls[1])
-f2 <- read_stars(href_ls[2])
-new <- c(f1, f2)
-
-r_stars <- read_stars(c(href_ls[1], href_ls[2], href_ls[3]), proxy = TRUE, along = "attr") # argument along is for determining how several arrays are combined
-r_stars |>
-    slice(index = 1, along = "attr") |>
-    plot()
-
-# multiband file with gdalcubes
-
-vireo_col <- create_image_collection("/home/claire/desktop/vireo_data_test/vireo_single_file.tif")
-
-
-
-
-
-
-
-
-vireos <- brick("/home/claire/desktop/vireo_data_test/vireo_single_file.tif")
-
-
-
-names(vireos)
-band
-
-
-
-
-
-
-
-
-lc1
-
-bbox <- st_bbox(c(xmin = -76, xmax = -70, ymax = 54, ymin = 50), crs = st_crs(4326))
-lc2 <- lc1 |> st_crop(bbox)
-
-pal <- colorRampPalette(c("black", "darkblue", "red", "yellow", "white"))
-plot(lc2, breaks = seq(0, 100, 10), col = pal(10))
-
-for (i in 1:length(it_obj$features)) {
-    it_obj$features[[i]]$assets$data$roles <- "data"
-}
-
-st <- stac_image_collection(it_obj$features, asset_names = c("data"), property_filter = function(f) {
-    f[["class"]] %in% c("1", "2", "3", "4")
-}, srs = "EPSG:4326")
-st
-
-
-bbox <- st_bbox(c(xmin = -483695, xmax = -84643, ymin = 112704, ymax = 684311), crs = st_crs(32198))
-
-v <- cube_view(srs = "EPSG:32198", extent = list(
-    t0 = "2000-01-01", t1 = "2000-01-01",
-    left = bbox$xmin, right = bbox$xmax, top = bbox$ymax, bottom = bbox$ymin
-), dx = 1000, dy = 1000, dt = "P1D", aggregation = "sum", resampling = "mean")
-
-lc_cube <- raster_cube(st, v)
-lc_cube |> plot(zlim = c(0, 100), col = pal(10))
-
-
+#### Fonction de Guillaume ###
+
+library(gdalcubes)
+library(rstac)
+library(sf)
+gdalcubes_options(parallel = TRUE)
+
+ecod <- st_read("https://object-arbutus.cloud.computecanada.ca/bq-io/acer/qc_polygons/sf_eco_poly/qc_ecodistricts.gpkg")
+ecod <- rmapshaper::ms_simplify(ecod)
+ecod6622 <- st_transform(ecod, "EPSG:6622")
+poly <- ecod6622[70, ]
+bb <- st_bbox(poly)
+
+s_obj <- stac("https://acer.biodiversite-quebec.ca/stac/")
 it_obj <- s_obj |>
-    collections("accessibility_to_cities") |>
-    items() |>
-    get_request() |>
-    items_fetch()
-v <- cube_view(srs = "EPSG:32198", extent = list(
-    t0 = "2015-01-01", t1 = "2015-01-01",
-    left = bbox$xmin, right = bbox$xmax, top = bbox$ymax, bottom = bbox$ymin
-), dx = 1000, dy = 1000, dt = "P1D", aggregation = "mean", resampling = "bilinear")
-for (i in 1:length(it_obj$features)) {
-    it_obj$features[[i]]$assets$data$roles <- "data"
-}
-st <- stac_image_collection(it_obj$features)
-lc_cube <- raster_cube(st, v)
-lc_cube |> plot(col = heat.colors)
-
-it_obj <- s_obj |>
-    stac_search(collections = "chelsa-monthly", datetime = "2010-06-01T00:00:00Z/2019-08-01T00:00:00Z") |>
-    get_request() |>
+    stac_search(collections = "oiseaux-nicheurs-qc", limit = 1000) |>
+    post_request() |>
     items_fetch()
 
 v <- cube_view(
-    srs = "EPSG:32198", extent = list(
-        t0 = "2010-06-01", t1 = "2019-08-31",
-        left = bbox$xmin, right = bbox$xmax, top = bbox$ymax, bottom = bbox$ymin
+    extent = list(
+        left = bb["xmin"], right = bb["xmax"],
+        bottom = bb["ymin"], top = bb["ymax"], t0 = "1992-01-01", t1 = "1992-01-01"
     ),
-    dx = 1000, dy = 1000, dt = "P10Y",
-    aggregation = "mean",
-    resampling = "bilinear"
+    # extent = list(
+    #     left = -500000, right = -200000,
+    #     bottom = 250000, top = 400000, t0 = "1992-01-01", t1 = "1992-01-01"
+    # ),
+    srs = "EPSG:6622", dx = 10000, dy = 10000, dt = "P1Y", aggregation = "max"
 )
 
-for (i in 1:length(it_obj$features)) {
-    names(it_obj$features[[i]]$assets) <- "data"
-    it_obj$features[[i]]$assets$data$roles <- "data"
+# Test de cube view avec un extend de polygone
+# poly <- ecoz[5, ]
+# poly_bbox <- st_bbox(poly)
+
+# v <- cube_view(
+#     extent = list(
+#         left = poly_bbox[1], right = poly_bbox[3],
+#         bottom = poly_bbox[2], top = poly_bbox[4], t0 = "1992-01-01", t1 = "1992-01-01"
+#     ),
+#     srs = "EPSG:6622", dx = 10000, dy = 10000, dt = "P1Y", aggregation = "max"
+# )
+
+# v2 <- cube_view(srs = "EPSG:6622", dx = 10000, dy = 10000, dt = "P1Y", aggregation = "max", resampling = "average", extent = list(left = bbox["xmin"] - 1000, right = bbox["xmax"] + 1000,
+#         bottom = bbox["ymin"] - 1000, top = bbox["ymax"] + 1000, t0 = "1992-01-01", t1 = "1992-01-01"))
+
+# gdalcubes_options(parallel = 16)
+# cb <- raster_cube(tc, v2) |>
+#     filter_geom(poly$geom)
+# plot(cb)
+
+n <- data.frame(species = character(), max = numeric())
+j <- 0
+for (i in 1:items_length(it_obj)) {
+    tmp_it <- it_obj
+    tmp_it$features <- it_obj$features[[i]]
+    if (tmp_it$features$properties$map == "pocc" & tmp_it$features$properties$year == "1992") {
+        j <- j + 1
+        tc <- stac_image_collection(it_obj$features[i], asset_names = c("data"))
+        cube <- raster_cube(tc, v)
+        cube |> write_tif("/home/local/USHERBROOKE/juhc3201/Downloads/GIS/tmp")
+        arr <- cube |>
+            apply_pixel("data>0.25") |>
+            reduce_space("max(band1)") |> # plot possible avec valeurs par chaque pas de temps (si il y en a de defini)
+            as_array()
+        n[j, "species"] <- tmp_it$features$properties$species
+        n[j, "max"] <- arr[1]
+    }
 }
-anames <- unlist(lapply(it_obj$features, function(f) {
-    f["id"]
-}))
-st <- stac_image_collection(it_obj$features, asset_names = "data", property_filter = function(f) {
-    f[["variable"]] == "tas" & (f[["month"]] %in% c(6, 7, 8))
-})
-c_cube <- raster_cube(st, v)
-c_cube |> plot(col = heat.colors)
-
-it_obj[["features"]][[1]]$properties
 
 
 
 
 
-create_image_collection()
+
+
+
+
+
+
+
+
+
+
+
+
+# https://appelmar.github.io/ogh2021/tutorial.html
+
+library(rstac)
+library(gdalcubes)
+library(stars)
+library(tmap)
+library(sf)
+
+# area of interest
+ecoz <- st_read("https://object-arbutus.cloud.computecanada.ca/bq-io/acer/qc_polygons/sf_eco_poly/qc_ecozones.gpkg")
+ecoz <- rmapshaper::ms_simplify(ecoz)
+poly <- ecoz[6, ]
+
+tmap_mode("view")
+tm_shape(st_geometry(poly)) + tm_polygons()
+
+st_crs(poly)
+
+# We aim at generating a cloud-free composite image of our study area for June, 2018 and we use the rstac package to find suitable Sentinel-2 images. However, to use the bbox argument of the corresponding function stac_search() for spatial filtering, we first need to derive and transform the bounding box to latitude / longitude (WGS84) values, for which we use the st_bbox() and st_transform() functions.
+
+bbox <- st_bbox(poly)
+bbox
+
+st_as_sfc(bbox) |>
+    st_transform("EPSG:4326") |>
+    st_bbox() -> bbox_wgs84
+bbox_wgs84
+
+s <- stac("https://acer.biodiversite-quebec.ca/stac/")
+
+items <- s |>
+    stac_search(
+        collections = "oiseaux-nicheurs-qc",
+        bbox = c(
+            bbox_wgs84["xmin"], bbox_wgs84["ymin"],
+            bbox_wgs84["xmax"], bbox_wgs84["ymax"]
+        ),
+        datetime = "2000-01-01/2000-12-31",
+        limit = 500
+    ) |>
+    post_request()
+items
