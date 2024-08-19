@@ -6,6 +6,8 @@ library(stars)
 library(terra)
 library(dplyr)
 
+#### Utilisation et exploration du catalogue STA ####
+# ------------------------------------------------ #
 # Connexion au catalogue STAC ACER
 acer <- stac("https://acer.biodiversite-quebec.ca/stac/")
 io <- stac("https://io.biodiversite-quebec.ca/stac/")
@@ -72,6 +74,8 @@ ras2 <- sum(ras)
 plot(ras2)
 
 #### FUNCTION pour extraire richesse specifique dans le temps a l'echelle du QC ####
+# ------------------------------------------------------------------------------- #
+
 sr_trend <- function(catalog = "acer", collection = "oiseaux-nicheurs-qc", years = NULL) {
     stac_cat <- stac(paste0("https://", catalog, ".biodiversite-quebec.ca/stac/"))
     # spe_num_df <- data.frame(year = numeric(), spe_rich = numeric())
@@ -116,7 +120,8 @@ sr_trend(years = 1995)
 sr_trend(years = 2011:2015)
 
 
-#### fonction pour calcul de RS dans le temps pour un polygone donne ####
+#### fonction pour calcul de RS dans le temps pour un polygone donne avec COGgtif multiband ####
+# ------------------------------------------------------------------------------------------- #
 # see https://rdrr.io/cran/gdalcubes/man/extract_geom.html
 ecoz <- st_read("https://object-arbutus.cloud.computecanada.ca/bq-io/acer/qc_polygons/sf_eco_poly/qc_ecozones.gpkg")
 ecoz <- rmapshaper::ms_simplify(ecoz)
@@ -201,7 +206,9 @@ lapply(ecoz_rs_ls, function(x) {
 })
 
 
-#### Fonction de Guillaume ###
+
+#### Premiere methode de Guillaume ####
+# ---------------------------------- #
 
 library(gdalcubes)
 library(rstac)
@@ -216,9 +223,9 @@ bb <- st_bbox(poly)
 
 s_obj <- stac("https://acer.biodiversite-quebec.ca/stac/")
 it_obj <- s_obj |>
-    stac_search(collections = "oiseaux-nicheurs-qc", limit = 1000) |>
+    stac_search(collections = "oiseaux-nicheurs-qc", limit = 10) |>
     post_request() |>
-    items_fetch()
+    items_fetch() # long request
 
 v <- cube_view(
     extent = list(
@@ -271,61 +278,104 @@ for (i in 1:items_length(it_obj)) {
     }
 }
 
+#### deuxieme solution de Guillaume ####
+# ----------------------------------- #
+
+ecod <- st_read("https://object-arbutus.cloud.computecanada.ca/bq-io/acer/qc_polygons/sf_eco_poly/qc_ecodistricts.gpkg")
+ecod <- rmapshaper::ms_simplify(ecod)
 
 
+ecod6622 <- st_transform(ecod, "EPSG:6622")
 
 
+poly <- ecod6622[20, ]
+poly <- ecod6622
+
+bb <- st_bbox(poly)
+bb <- st_bbox(ecod6622)
 
 
+v <- cube_view(
+    extent = list(
+        left = bb["xmin"], right = bb["xmax"],
+        bottom = bb["ymin"], top = bb["ymax"],
+        t0 = "1992-01-01", t1 = "1992-01-01"
+    ),
+    srs = "EPSG:6622", dx = 10000, dy = 10000, dt = "P1Y", aggregation = "max"
+)
 
 
-
-
-
-
-
-
-
-
-# https://appelmar.github.io/ogh2021/tutorial.html
-
-library(rstac)
-library(gdalcubes)
-library(stars)
-library(tmap)
-library(sf)
-
-# area of interest
-ecoz <- st_read("https://object-arbutus.cloud.computecanada.ca/bq-io/acer/qc_polygons/sf_eco_poly/qc_ecozones.gpkg")
-ecoz <- rmapshaper::ms_simplify(ecoz)
-poly <- ecoz[6, ]
-
-tmap_mode("view")
-tm_shape(st_geometry(poly)) + tm_polygons()
-
-st_crs(poly)
-
-# We aim at generating a cloud-free composite image of our study area for June, 2018 and we use the rstac package to find suitable Sentinel-2 images. However, to use the bbox argument of the corresponding function stac_search() for spatial filtering, we first need to derive and transform the bounding box to latitude / longitude (WGS84) values, for which we use the st_bbox() and st_transform() functions.
-
-bbox <- st_bbox(poly)
-bbox
-
-st_as_sfc(bbox) |>
-    st_transform("EPSG:4326") |>
-    st_bbox() -> bbox_wgs84
-bbox_wgs84
-
-s <- stac("https://acer.biodiversite-quebec.ca/stac/")
-
-items <- s |>
-    stac_search(
-        collections = "oiseaux-nicheurs-qc",
-        bbox = c(
-            bbox_wgs84["xmin"], bbox_wgs84["ymin"],
-            bbox_wgs84["xmax"], bbox_wgs84["ymax"]
-        ),
-        datetime = "2000-01-01/2000-12-31",
-        limit = 500
+it_obj <- acer |>
+    ext_filter(
+        collection %in% c("oiseaux-nicheurs-qc") &&
+            `map` %in% c("range") &&
+            `year` == 1992
     ) |>
-    post_request()
-items
+    get_request() |>
+    items_fetch()
+
+
+n <- data.frame(species = character(), max = numeric())
+j <- 0
+# for (i in 1:items_length(it_obj)) {
+for (i in 1:20) {
+    tmp_it <- it_obj
+
+    tmp_it$features <- it_obj$features[[i]]
+    # if (tmp_it$features$properties$map == "occ" & tmp_it$features$properties$year == "1992") {
+    j <- j + 1
+    tc <- create_image_collection(
+        c(paste0("/vsicurl/", it_obj$features[[i]]$assets$data$href)),
+        date_time = c("1992-01-01"),
+        band_names = "data"
+    )
+    cube <- raster_cube(tc, v)
+    arr <- cube |>
+        filter_geom(poly$geom) |>
+        reduce_space("max(data)") |>
+        as_array()
+    n[j, "species"] <- tmp_it$features$properties$species
+    n[j, "max"] <- arr[1]
+    # }
+}
+
+#### Troisiseme solution de Guillaume - Titiler ####
+# ----------------------------------------------- #
+library(jsonlite)
+library(geojsonsf)
+library(httr2)
+
+acer <- stac("https://acer.biodiversite-quebec.ca/stac/")
+
+it_obj <- acer |>
+    ext_filter(
+        collection == collection &&
+            `map` %in% c("range") &&
+            `year` == {{ 1997 }}
+    ) |>
+    get_request() |>
+    items_fetch()
+
+n2 <- data.frame(species = character(), max = numeric())
+j <- 0
+
+for (i in 1:items_length(it_obj)) {
+    tmp_it <- it_obj
+    tmp_it$features <- it_obj$features[[i]]
+
+    # if (tmp_it$features$properties$map == "occ" & tmp_it$features$properties$year == "1992") {
+    #     j <- j + 1
+    print(it_obj$features[[i]]$assets$data$href)
+    req <- request("https://tiler.biodiversite-quebec.ca/cog/statistics") |>
+        req_body_raw(geojson_sf(toJSON(it_obj$features[[i]])) |> st_set_crs(st_crs("EPSG:6622")) |>
+            st_transform("EPSG:4326") |>
+            sf_geojson()) |>
+        req_url_query(url = it_obj$features[[i]]$assets$data$href, categorical = "TRUE") |>
+        req_perform() |>
+        resp_body_json()
+
+    n2[i, "species"] <- tmp_it$features$properties$species
+    n2[i, "max"] <- req$features[[1]]$properties$statistics$b1$max
+    # }
+}
+n2
