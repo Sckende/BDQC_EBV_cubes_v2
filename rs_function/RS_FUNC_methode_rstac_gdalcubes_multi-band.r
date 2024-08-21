@@ -94,9 +94,9 @@ test1b <- sr_spat_temp_trend(years = c(1992))
 # RS pour le Qc pour toutes les annees (1992:2017)
 test2b <- sr_spat_temp_trend()
 # RS pour deux polygones en 2000
-test3b <- sr_spat_temp_trend(polygon = qc[c(5, 30), ], yers = 2000)
+test3b <- sr_spat_temp_trend(polygon = qc[c(5, 30), ], years = 2000)
 # RS pour deux polygones en 1998 & 2010
-test4b <- sr_spat_temp_trend(polygon = qc[c(10, 70), ], yers = c(1998, 2010))
+test4b <- sr_spat_temp_trend(polygon = qc[c(10, 70), ], years = c(1998, 2010))
 
 rs <- sr_spat_temp_trend(years = c(1992, 2003, 2017), polygon = ecod)
 rs |> print(n = 303)
