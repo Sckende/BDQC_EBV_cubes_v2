@@ -35,6 +35,7 @@ plot(range)
 qc <- ms_simplify(st_read("https://object-arbutus.cloud.computecanada.ca/bq-io/acer/qc_polygons/sf_eco_poly/qc_ecodistricts.gpkg"))
 qc1 <- st_as_sf(as.data.frame(st_combine(qc)))
 qc32198 <- st_transform(qc1, "EPSG:32198")
+qc4326 <- st_transform(qc, "EPSG:4326")
 st_geometry(qc32198) <- "geom"
 
 poly <- qc[10, ]
@@ -67,8 +68,8 @@ sr_spat_temp_trend <- function(catalog = "acer", collection = "oiseaux-nicheurs-
         for (y in years) {
             # print(y)
             # Retrieve the multi-band raster !!!! A MODIFIER QUAND FILES DANS ACER STAC !!!
-            # multi <- rast(paste0("/home/claire/desktop/data/multiband/", y, "_range_multiband_renamed.tif")) # yoga
-            multi <- rast(paste0("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/inla_multiband/", y, "_range_multiband_renamed.tif")) # xps
+            multi <- rast(paste0("/home/claire/desktop/data/multiband/", y, "_range_multiband_renamed.tif")) # yoga
+            # multi <- rast(paste0("/home/local/USHERBROOKE/juhc3201/BDQC-GEOBON/data/QUEBEC_in_a_cube/Richesse_spe_version_2/inla_multiband/", y, "_range_multiband_renamed.tif")) # xps
 
 
             # extract raster values in polygon for each band
@@ -88,10 +89,14 @@ sr_spat_temp_trend <- function(catalog = "acer", collection = "oiseaux-nicheurs-
 }
 
 # Zone de test #
-sr_spat_temp_trend(years = 2000, polygon = poly)
-sr_spat_temp_trend(years = 2000, polygon = ecod)
-test <- sr_spat_temp_trend(years = 2000)
-test$spe_ls
+# RS pour le Qc en 1992
+test1b <- sr_spat_temp_trend(years = c(1992))
+# RS pour le Qc pour toutes les annees (1992:2017)
+test2b <- sr_spat_temp_trend()
+# RS pour deux polygones en 2000
+test3b <- sr_spat_temp_trend(polygon = qc[c(5, 30), ], yers = 2000)
+# RS pour deux polygones en 1998 & 2010
+test4b <- sr_spat_temp_trend(polygon = qc[c(10, 70), ], yers = c(1998, 2010))
 
 rs <- sr_spat_temp_trend(years = c(1992, 2003, 2017), polygon = ecod)
 rs |> print(n = 303)
