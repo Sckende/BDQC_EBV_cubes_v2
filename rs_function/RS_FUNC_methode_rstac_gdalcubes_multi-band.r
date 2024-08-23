@@ -88,11 +88,14 @@ sr_spat_temp_trend <- function(catalog = "acer", collection = "oiseaux-nicheurs-
     final
 }
 
-# Zone de test #
+#### Zone de test ####
 # RS pour le Qc en 1992
 test1b <- sr_spat_temp_trend(years = c(1992))
+# RS pour le Qc en 1992 et 1 polygone
+test1_1b <- sr_extract(years = c(1992), polygon = qc[70, ])
 # RS pour le Qc pour toutes les annees (1992:2017)
 test2b <- sr_spat_temp_trend()
+test2b |> print(n = 100)
 # RS pour deux polygones en 2000
 test3b <- sr_spat_temp_trend(polygon = qc[c(5, 30), ], years = 2000)
 # RS pour deux polygones en 1998 & 2010

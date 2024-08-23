@@ -92,11 +92,10 @@ sr_extract <- function(catalog = "acer", collection = "oiseaux-nicheurs-qc", yea
 }
 
 
-
 #### test zone ####
 
 # RS pour le Qc en 1992
-test1 <- sr_extract(years = c(1992))
+test1b <- sr_extract(years = c(2000))
 # RS pour le Qc pour toutes les annees (1992:2017)
 test2 <- sr_extract()
 # RS pour deux polygones en 2000
