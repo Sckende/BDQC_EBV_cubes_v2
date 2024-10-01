@@ -109,12 +109,11 @@ sr_extract <- function(catalog = "acer", collection = "oiseaux-nicheurs-qc", typ
     final <- left_join(spe_num_df, polygon[, c("polygon_id", "geom")], by = c("polygon_id"))
     final
     } else {
-        library(terra)
         if(is.null(species)){
         stop("Species must be indicated")
         }
 
-    spe_area_df <-  tibble(year = numeric(), species = character(), spe_area = numeric())
+    spe_area_df <-  tibble(year = numeric(), species = character(), spe_area_km2 = numeric())
 
     for (spe in species){
         print(spe)
@@ -133,9 +132,12 @@ sr_extract <- function(catalog = "acer", collection = "oiseaux-nicheurs-qc", typ
                 spe_area = 0
             } else {
                 map <- rast(it_obj$features[[1]]$assets$data$href)
-                spe_area <- sum(values(map)) # WARNING attention a la projection
+                map_pj <- project(map, "EPSG:6623", method = "near") # conversion en proj equal area
+
+                spe_area <- sum(values(map_pj)) * res(map_pj)[1]² / 1000000 # calcul de l'aire a partir de la res du raster en km2
             }
-            spe_area_df <- add_row(spe_area_df, year = y, species = spe, spe_area = spe_area)
+
+            spe_area_df <- add_row(spe_area_df, year = y, species = spe, spe_area_km2 = spe_area)
         }
     }
         
@@ -194,3 +196,7 @@ lapply(split(test6, test6$species), function(x){
 })
 #### TO DO 
 # 1 - calcul reelle de la superficie en fonction de la proj
+map_pj <- project(map, "EPSG:6623", method = "near")
+sum(values(map_pj)) * 10020.97 * 10020.97 / 1000000
+
+sum(values(map)) * 10020.97 * 10020.97 / 1000000
