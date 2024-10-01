@@ -1,5 +1,3 @@
-# ----------> TO DO: integrer filtrage par polygones + construire la fonction
-
 library(jsonlite)
 library(geojsonsf)
 library(httr2)
