@@ -134,7 +134,7 @@ sr_extract <- function(catalog = "acer", collection = "oiseaux-nicheurs-qc", typ
                 map <- rast(it_obj$features[[1]]$assets$data$href)
                 map_pj <- project(map, "EPSG:6623", method = "near") # conversion en proj equal area
 
-                spe_area <- sum(values(map_pj)) * res(map_pj)[1]² / 1000000 # calcul de l'aire a partir de la res du raster en km2
+                spe_area <- sum(values(map_pj)) * res(map_pj)[1] * res(map_pj)[1] / 1000000 # calcul de l'aire a partir de la res du raster en km2
             }
 
             spe_area_df <- add_row(spe_area_df, year = y, species = spe, spe_area_km2 = spe_area)
@@ -188,7 +188,7 @@ test6 <- sr_extract(catalog = "acer", collection = "oiseaux-nicheurs-qc", type =
 plot(test4$year, test4$spe_area, type = "b")
 par(mfrow = c(2, 2))
 lapply(split(test5, test5$species), function(x){
-    plot(x = x$year, y = x$spe_area, main = unique(x$species), type = "b")
+    plot(x = x$year, y = x$spe_area_km2, main = unique(x$species), type = "b")
 })
 par(mfrow = c(3, 4))
 lapply(split(test6, test6$species), function(x){
