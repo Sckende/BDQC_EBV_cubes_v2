@@ -164,3 +164,15 @@ pcoPlotFunc(
     eucli_pco$points[, 1], eucli_pco$points[, 2], numSeqs * numReps, numSteps, numReps, "",
     plotChr, plotCol, "b. Euclidean"
 )
+
+# ==> to continue
+
+# ---------- #
+# Methode 4 - comparaison des histogrammes de valeurs de pixels
+# ---------- #
+x11()
+par(mfrow = c(3, 2))
+for (i in 1:6) {
+    hist(values(ras_ls[[i]]), breaks = seq(0, 1, 0.01))
+}
+hist(values(max1))
