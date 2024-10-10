@@ -76,3 +76,91 @@ par(mfrow = c(6, 1))
 for (i in 1:6) {
     barplot(mat_I[i, ])
 }
+
+# ---------- #
+# Methode 3 - Wilson, 2011 - https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/j.2041-210X.2011.00115.x#b73
+# ---------- #
+# --> calcul de la similarite/dissimilarite sur la base des distances euclidienne et d'Hellinger puis PCoA
+
+# library(philentropy)
+library(labdsv)
+
+mat1 <- as.matrix(max1)
+mat2 <- as.matrix(max2)
+
+# code from supplementary information - Wilson 2011
+HellingerDist <- function(mat1, mat2) {
+    p1 <- sum(mat1, na.rm = T)
+    p2 <- sum(mat2, na.rm = T)
+    return(sqrt(0.5 * sum((sqrt(mat1 / p1) - sqrt(mat2 / p2))^2, na.rm = T)))
+}
+HellingerDist(mat1, mat2)
+
+EuclideanDist <- function(mat1, mat2) {
+    return(sqrt(sum((mat1 - mat2)^2, na.rm = T)))
+}
+EuclideanDist(mat1, mat2)
+
+NormEuclideanDist <- function(mat1, mat2) {
+    p1 <- mat1 / sum(mat1, na.rm = T)
+    p2 <- mat2 / sum(mat2, na.rm = T)
+    return(sqrt(sum((p1 - p2)^2, na.rm = T)))
+}
+NormEuclideanDist(mat1, mat2)
+
+hell_mat <- matrix(nrow = 6, ncol = 6)
+eucli_mat <- matrix(nrow = 6, ncol = 6)
+
+for (i in 1:6) {
+    for (j in 1:6) {
+        hell_mat[i, j] <- HellingerDist(as.matrix(ras_ls[[i]]), as.matrix(ras_ls[[j]]))
+        eucli_mat[i, j] <- EuclideanDist(as.matrix(ras_ls[[i]]), as.matrix(ras_ls[[j]]))
+    }
+}
+
+hell_pco <- pco(as.dist(hell_mat))
+eucli_pco <- pco(as.dist(eucli_mat))
+
+
+# visualisation
+pcoPlotFunc <- function(
+    xpts, ypts, numTests, numSteps, numReps, aTitle, PlotChars, PlotCol,
+    PlotTag) {
+    plot(xpts, ypts, xlab = "Axis 1", ylab = "Axis 2", pch = PlotChars, col = PlotCol, main = aTitle, cex = 1.5)
+    mtext(PlotTag, line = 1, font = 2, adj = 0)
+    text(xpts[1], ypts[1], "Start", pos = 2, offset = 1)
+    text(xpts[length(xpts)], ypts[length(xpts)], "End 1,3", pos = 4, offset = 1)
+    n <- 1 + (numSteps - 1) + (numSteps * numReps)
+    text(xpts[n], ypts[n], "End 2", pos = 4, offset = 1)
+    j <- 1:numSteps
+    for (i in 1:numTests)
+    {
+        k <- numSteps * (i - 1) + j
+        lines(xpts[k], ypts[k], lty = 2)
+    }
+}
+# Number of moving patterns or “sequences”
+numSeqs <- 3
+# Number of steps along a sequence
+numSteps <- 3
+# Number of replicates of a sequence to be generated
+numReps <- 5
+
+plotChr <- c(rep(16, numSteps * numReps), rep(17, numSteps * numReps), rep(3, numSteps * numReps))
+c1 <- rgb(102, 102, 51, maxColorValue = 255)
+c2 <- rgb(102, 102, 255, maxColorValue = 255)
+c3 <- rgb(204, 204, 102, maxColorValue = 255)
+plotCol <- rep(c(c1, c2, c3), numSeqs * numReps)
+
+x11()
+par(mfrow = c(1, 2))
+# PCoA of Hellinger Distance
+pcoPlotFunc(
+    hell_pco$points[, 1], hell_pco$points[, 2], numSeqs * numReps, numSteps, numReps, "",
+    plotChr, plotCol, "a. Hellinger"
+)
+# PCoA of Euclidean Distance
+pcoPlotFunc(
+    eucli_pco$points[, 1], eucli_pco$points[, 2], numSeqs * numReps, numSteps, numReps, "",
+    plotChr, plotCol, "b. Euclidean"
+)
