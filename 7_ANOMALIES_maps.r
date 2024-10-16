@@ -96,6 +96,7 @@ reorder_cormat <- function(cormat) {
 # Visualisation
 library(reshape2)
 library(ggplot2)
+library(corrplot) # https://cran.r-project.org/web/packages/corrplot/vignettes/corrplot-intro.html
 
 low_mat <- get_lower_tri(mat_D)
 low_mat2 <- melt(low_mat, na.rm = T)
@@ -117,7 +118,9 @@ ggplot(data = mat_reord3, aes(Var2, Var1, fill = value)) +
         size = 12, hjust = 1
     )) +
     coord_fixed() +
-    geom_text(aes(Var2, Var1, label = value), color = "black", size = 4)
+    geom_text(aes(Var2, Var1, label = round(value, 2)), color = "black", size = 4)
+
+
 # ---------- #
 # Methode 3 - Wilson, 2011 - https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/j.2041-210X.2011.00115.x#b73
 # ---------- #
