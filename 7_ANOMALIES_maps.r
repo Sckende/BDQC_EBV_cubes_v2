@@ -70,7 +70,6 @@ for (i in 1:6) {
     for (j in 1:6) {
         mat_I[i, j] <- nicheOverlap(raster(ras_ls[[i]]), raster(ras_ls[[j]]), stat = "I")
         mat_D[i, j] <- nicheOverlap(raster(ras_ls[[i]]), raster(ras_ls[[j]]), stat = "D")
-        print(paste0("Comparaison ", i, " et ", j, " done"))
     }
 }
 
@@ -185,11 +184,11 @@ pcoPlotFunc <- function(
     }
 }
 # Number of moving patterns or “sequences”
-numSeqs <- 3
+numSeqs <- 1
 # Number of steps along a sequence
-numSteps <- 3
+numSteps <- 1
 # Number of replicates of a sequence to be generated
-numReps <- 5
+numReps <- 1
 
 plotChr <- c(rep(16, numSteps * numReps), rep(17, numSteps * numReps), rep(3, numSteps * numReps))
 c1 <- rgb(102, 102, 51, maxColorValue = 255)
@@ -221,3 +220,10 @@ for (i in 1:6) {
     hist(values(ras_ls[[i]]), breaks = seq(0, 1, 0.01))
 }
 hist(values(max1))
+
+#### PERMANOVA ####
+library(vegan)
+
+mat <- as.dist(hell_mat)
+
+# ----> see the adonis2() function
